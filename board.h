@@ -1,1 +1,71 @@
+enum pieces {
+    empty = 0,
+    whiteKing = 1,
+    whiteQueen = 2,
+    whiteRook = 3,
+    whiteBishop = 4,
+    whiteKnight = 5,
+    whitePawn = 6,
+    blackKing = -1,
+    blackQueen = -2,
+    blackRook = -3,
+    blackBishop = -4,
+    blackKnight = -5,
+    blackPawn = -6
+};
+
+typedef struct {
+    int x;
+    int y;
+} Pos;
+
+typedef struct {
+    Pos from;
+    Pos to;
+} Move;
+
+class Board {
+private:
+    int b[8][8];
+    bool isWhitesTurn;
+    int movesPlayed;
+
+public:
+    void resetBoard();
+
+    char getPieceChar(int piece);
+
+    std::string moveToNotation(Move m);
+
+    void doMove(Move m);
+
+    int getPos(Pos p);
+
+    bool isPosWhite(Pos p);
+
+    bool isValidMove(Move m);
+
+    void getAllValidMoves(std::vector<Move> *moves);
+
+    void getMovesForPiece(std::vector<Move> *moves, Pos p);
+
+    bool posOnBoard(Pos p);
+
+    bool isSquareAvailable(Pos p, bool isWhite);
+
+    void getKingMoves(std::vector<Move> *moves, Pos p);
+
+    void getQueenMoves(std::vector<Move> *moves, Pos p);
+
+    void getRookMoves(std::vector<Move> *moves, Pos p);
+
+    void getBishopMoves(std::vector<Move> *moves, Pos p);
+
+    void getKnightMoves(std::vector<Move> *moves, Pos p);
+
+    void getPawnMoves(std::vector<Move> *moves, Pos p);
+
+    void printBoard();
+};
+
 int main();

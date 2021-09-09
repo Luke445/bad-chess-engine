@@ -1,34 +1,8 @@
 #include <iostream>
 #include <vector>
-#include <algorithm>
+#include "board.h"
 
 using namespace std;
-
-enum peices {
-    empty = 0,
-    whiteKing = 1,
-    whiteQueen = 2,
-    whiteRook = 3,
-    whiteBishop = 4,
-    whiteKnight = 5,
-    whitePawn = 6,
-    blackKing = -1,
-    blackQueen = -2,
-    blackRook = -3,
-    blackBishop = -4,
-    blackKnight = -5,
-    blackPawn = -6
-};
-
-typedef struct {
-    int x;
-    int y;
-} Pos;
-
-typedef struct {
-    Pos from;
-    Pos to;
-} Move;
 
 static const Pos knightOffsets[8] = {{2, 1}, {1, 2}, {-2, 1}, {-1, 2}, {2, -1}, {1, -2}, {-2, -1}, {-1, -2}};
 
@@ -43,228 +17,287 @@ static const int startingBoard[8][8] = {
     {whiteRook, whiteKnight, whiteBishop, whiteQueen, whiteKing, whiteBishop, whiteKnight, whiteRook}
 };
 
-class Board {
-public:
-    int b[8][8];
-    bool isWhitesTurn;
-    int getBoardSpot(int x, int y) {
-        return b[y][x];
-    }
-    void resetBoard() {
-        memcpy(b, startingBoard, 8*8*sizeof(int));
-        isWhitesTurn = true;
-    }
-    
-    char getPeiceChar(int peice) {
-        switch (abs(peice)) {
-            case 1:
-                return 'K';
-            case 2:
-                return 'Q';
-            case 3:
-                return 'R';
-            case 4:
-                return 'B';
-            case 5:
-                return 'N';
-            case 6:
-                return 'P';
-            default:
-                return ' ';
-        }
-    }
-    
-    char *moveToNotation(Move m) {
-        // TODO
-        return "";
-    }
-    
-    void doMove(Move m) {
-        b[m.to.x][m.to.y] = b[m.from.x][m.from.y];
-        b[m.from.x][m.from.y] = 0;
-    }
+void Board::resetBoard() {
+    memcpy(b, startingBoard, 8*8*sizeof(int));
+    isWhitesTurn = true;
+    movesPlayed = 0;
+}
 
-    bool isValidMove(Move m) {
-        vector<Move> moves;
-        getMovesForPiece(moves, m.from);
-        for (Move x : moves) {
-            if (x.to.x == m.to.x && x.to.y == m.to.y) {
-                return true;
-            }
-        }
-        return false;
+char Board::getPieceChar(int piece) {
+    // abs switches black pieces to white
+    switch (abs(piece)) {
+        case whiteKing:
+            return 'K';
+        case whiteQueen:
+            return 'Q';
+        case whiteRook:
+            return 'R';
+        case whiteBishop:
+            return 'B';
+        case whiteKnight:
+            return 'N'; // K already used so N is standard replacement
+        case whitePawn:
+            return 'P';
+        default:
+            return ' ';
     }
- 
-    vector<Move> getAllValidMoves() {
-        // needs to limit moves if the move causes a check
-        vector<Move> out;
-        for (int i = 0; i < 8; i++) {
-            for (int j = 0; j < 8; j++) {
+}
+
+string Board::moveToNotation(Move m) {
+    // TODO: returns the chess notation of what this move would be on the current board
+    string from, to, out;
+    // change number to letter by using ascii table offset (+97)
+    from = ((char) m.from.x + 97);
+    from += to_string(m.from.y);
+    to = ((char) m.to.x + 97);
+    to += to_string(m.to.y);
+    bool isCapture = getPos(m.to) != empty;
+
+    out = from + to;
+    return out;
+}
+
+void Board::doMove(Move m) {
+    // y and x reversed
+    b[m.to.y][m.to.x] = b[m.from.y][m.from.x];
+    b[m.from.y][m.from.x] = empty;
+    isWhitesTurn = !isWhitesTurn;
+    movesPlayed++;
+}
+
+int Board::getPos(Pos p) {
+    // y and x reversed
+    return b[p.y][p.x];
+}
+
+bool Board::isPosWhite(Pos p) {
+    return getPos(p) > 0;
+}
+
+bool Board::isValidMove(Move m) {
+    vector<Move> moves;
+    getMovesForPiece(&moves, m.from);
+    for (Move x : moves) {
+        if (x.to.x == m.to.x && x.to.y == m.to.y) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void Board::getAllValidMoves(vector<Move> *moves) {
+    for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < 8; j++) {
+            Pos next = {i, j};
+            getMovesForPiece(moves, next);
+        }
+    }
+}
+
+void Board::getMovesForPiece(vector<Move> *moves, Pos p) {
+    // TODO: needs to account for checks
+    int piece = getPos(p);
+    // if piece color is different from current turn, return
+    if (isWhitesTurn != isPosWhite(p)) {
+        return;
+    }
+    // abs switches black pieces to white
+    switch (abs(piece)) {
+        case whiteKing:
+            getKingMoves(moves, p);
+            break;
+        case whiteQueen:
+            getQueenMoves(moves, p);
+            break;
+        case whiteRook:
+            getRookMoves(moves, p);
+            break;
+        case whiteBishop:
+            getBishopMoves(moves, p);
+            break;
+        case whiteKnight:
+            getKnightMoves(moves, p);
+            break;
+        case whitePawn:
+            getPawnMoves(moves, p);
+            break;
+        default:
+            break;
+    }
+}
+
+bool Board::posOnBoard(Pos p) {
+    return p.x >= 0 && p.x <= 7 && p.y >= 0 && p.y <= 7;
+}
+
+bool Board::isSquareAvailable(Pos p, bool isWhite) {
+    int piece = getPos(p);
+    return posOnBoard(p) && (piece == 0 || (piece > 0 != isWhite));
+}
+
+void Board::getKingMoves(vector<Move> *moves, Pos p) {
+    // TODO: needs castling
+    bool isWhite = isPosWhite(p);
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            if (i != 0 && j != 0) {
                 Pos next = {i, j};
-                getMovesForPiece(out, next);
-            }
-        }
-        return out;
-    }
-    
-    void getMovesForPiece(vector<Move> moves, Pos p) {
-        int peice = b[p.x][p.y];
-        switch (abs(b[p.x][p.y])) {
-            case 1:
-                getKingMoves(moves, p);
-                break;
-            case 2:
-                getQueenMoves(moves, p);
-                break;
-            case 3:
-                getRookMoves(moves, p);
-                break;
-            case 4:
-                getBishopMoves(moves, p);
-                break;
-            case 5:
-                getKnightMoves(moves, p);
-                break;
-            case 6:
-                getPawnMoves(moves, p);
-                break;
-            default:
-                break;
-        }
-    }
-    
-    bool isSquareAvaliable(Pos p, bool isWhite) {
-        int peice = b[p.x][p.y];
-        if (peice == 0 || (peice > 0 != isWhite)) {
-            return true;
-        }
-        return false;
-    }
-    
-    bool posOnBoard(Pos p) {
-        if (p.x >= 0 && p.x <= 7 && p.y >= 0 && p.y <= 7) {
-            return true;
-        }
-        return false;
-    }
-    
-    void getKingMoves(vector<Move> moves, Pos p) {
-        // needs castling
-        bool isWhite = b[p.x][p.y] > 0;
-        for (int i = 0; i < 3; i++) {
-            for (int j = 0; j < 3; j++) {
-                if (i != 0 && j != 0) {
-                    Pos next = {i, j};
-                    if (isSquareAvaliable(next, isWhite)) {
-                        moves.push_back((Move) {p, next});
-                    }
+                if (isSquareAvailable(next, isWhite)) {
+                    moves->push_back((Move) {p, next});
                 }
             }
         }
     }
-    
-    void getQueenMoves(vector<Move> moves, Pos p) {
-        getRookMoves(moves, p);
-        getBishopMoves(moves, p);
+}
+
+void Board::getQueenMoves(vector<Move> *moves, Pos p) {
+    getRookMoves(moves, p);
+    getBishopMoves(moves, p);
+}
+
+void Board::getRookMoves(vector<Move> *moves, Pos p) {
+    bool isWhite = isPosWhite(p);
+    for (int i = 0; p.x + i < 8; i++) {
+        Pos next = {p.x + i, p.y};
+        if (isSquareAvailable(next, isWhite)) {
+            moves->push_back((Move) {p, next});
+        } else {break;}
     }
-    
-    void getRookMoves(vector<Move> moves, Pos p) {
-        bool isWhite = b[p.x][p.y] > 0;
-        for (int i = 0; p.x + i < 8; i++) {
-            Pos next = {p.x + i, p.y};
-            if (isSquareAvaliable(next, isWhite)) {
-                moves.push_back((Move) {p, next});
-            } else {break;}
-        }
-        for (int i = 0; p.x - i < 8; i++) {
-            Pos next = {p.x - i, p.y};
-            if (isSquareAvaliable(next, isWhite)) {
-                moves.push_back((Move) {p, next});
-            } else {break;}
-        }
-        for (int i = 0; p.y + i < 8; i++) {
-            Pos next = {p.x, p.y - i};
-            if (isSquareAvaliable(next, isWhite)) {
-                moves.push_back((Move) {p, next});
-            } else {break;}
-        }
-        for (int i = 0; p.y - i < 8; i++) {
-            Pos next = {p.x, p.y - i};
-            if (isSquareAvaliable(next, isWhite)) {
-                moves.push_back((Move) {p, next});
-            } else {break;}
-        }
+    for (int i = 0; p.x - i < 8; i++) {
+        Pos next = {p.x - i, p.y};
+        if (isSquareAvailable(next, isWhite)) {
+            moves->push_back((Move) {p, next});
+        } else {break;}
     }
-    
-    void getBishopMoves(vector<Move> moves, Pos p) {
-        bool isWhite = b[p.x][p.y] > 0;
-        for (int i = 0; ; i++) {
-            Pos next = {p.x + i, p.y + i};
-            if (posOnBoard(next) && isSquareAvaliable(next, isWhite)) {
-                moves.push_back((Move) {p, next});
-            } else {break;}
-        }
-        for (int i = 0; ; i++) {
-            Pos next = {p.x - i, p.y + i};
-            if (posOnBoard(next) && isSquareAvaliable(next, isWhite)) {
-                moves.push_back((Move) {p, next});
-            } else {break;}
-        }
-        for (int i = 0; ; i++) {
-            Pos next = {p.x + i, p.y - i};
-            if (posOnBoard(next) && isSquareAvaliable(next, isWhite)) {
-                moves.push_back((Move) {p, next});
-            } else {break;}
-        }
-        for (int i = 0; ; i++) {
-            Pos next = {p.x - i, p.y - i};
-            if (posOnBoard(next) && isSquareAvaliable(next, isWhite)) {
-                moves.push_back((Move) {p, next});
-            } else {break;}
-        }
+    for (int i = 0; p.y + i < 8; i++) {
+        Pos next = {p.x, p.y - i};
+        if (isSquareAvailable(next, isWhite)) {
+            moves->push_back((Move) {p, next});
+        } else {break;}
     }
-    
-    void getKnightMoves(vector<Move> moves, Pos p) {
-        bool isWhite = b[p.x][p.y] > 0;
-        for (int i = 0; i < 8; i++) {
-            Pos offset = knightOffsets[i];
-            Pos next = {p.x + offset.x, p.y + offset.y};
-            if (isSquareAvaliable(next, isWhite)) {
-                moves.push_back((Move) {p, next});
-            } 
-        }
+    for (int i = 0; p.y - i < 8; i++) {
+        Pos next = {p.x, p.y - i};
+        if (isSquareAvailable(next, isWhite)) {
+            moves->push_back((Move) {p, next});
+        } else {break;}
     }
-    
-    void getPawnMoves(vector<Move> moves, Pos p) {
-        // add captures, 2 forward on first move, en passant, promotion
-        bool isWhite = b[p.x][p.y] > 0;
-        Pos next = {p.x, p.y + 1};
-        if (isWhite && isSquareAvaliable(next, isWhite)) {
-            moves.push_back((Move) {p, next});
-            return;
-        }
-        next = (Pos) {p.x, p.y - 1};
-        if (!isWhite && isSquareAvaliable(next, isWhite)) {
-            moves.push_back((Move) {p, next});
-            return;
+}
+
+void Board::getBishopMoves(vector<Move> *moves, Pos p) {
+    bool isWhite = isPosWhite(p);
+    for (int i = 0; ; i++) {
+        Pos next = {p.x + i, p.y + i};
+        if (posOnBoard(next) && isSquareAvailable(next, isWhite)) {
+            moves->push_back((Move) {p, next});
+        } else {break;}
+    }
+    for (int i = 0; ; i++) {
+        Pos next = {p.x - i, p.y + i};
+        if (posOnBoard(next) && isSquareAvailable(next, isWhite)) {
+            moves->push_back((Move) {p, next});
+        } else {break;}
+    }
+    for (int i = 0; ; i++) {
+        Pos next = {p.x + i, p.y - i};
+        if (posOnBoard(next) && isSquareAvailable(next, isWhite)) {
+            moves->push_back((Move) {p, next});
+        } else {break;}
+    }
+    for (int i = 0; ; i++) {
+        Pos next = {p.x - i, p.y - i};
+        if (posOnBoard(next) && isSquareAvailable(next, isWhite)) {
+            moves->push_back((Move) {p, next});
+        } else {break;}
+    }
+}
+
+void Board::getKnightMoves(vector<Move> *moves, Pos p) {
+    bool isWhite = isPosWhite(p);
+    for (int i = 0; i < 8; i++) {
+        Pos offset = knightOffsets[i];
+        Pos next = {p.x + offset.x, p.y + offset.y};
+        if (isSquareAvailable(next, isWhite)) {
+            moves->push_back((Move) {p, next});
         }
     }
-    
-    void printBoard() {
-        for (int x = 0; x < 8; x++) {
-            for (int y = 0; y < 8; y++) {
-                cout << getPeiceChar(b[x][y]) << " ";
-            }
-            cout << "\n";
-        }
+}
+
+void Board::getPawnMoves(vector<Move> *moves, Pos p) {
+    // TODO: en passant, promotion
+    bool isWhite = isPosWhite(p);
+    int offset, startingRank;
+    if (isWhite) {
+        offset = -1;
+        startingRank = 6;
     }
-};
+    else {
+        offset = 1;
+        startingRank = 1;
+    }
+    // move 2 forward
+    Pos next = {p.x, p.y + offset * 2};
+    if (p.y == startingRank && getPos(next) == empty && getPos((Pos) {p.x, p.y + offset}) == empty) {
+        moves->push_back((Move) {p, next});
+    }
+    // move 1 forward
+    next = (Pos) {p.x, p.y + offset};
+    if (getPos(next) == empty) {
+        moves->push_back((Move) {p, next});
+    }
+    // capture left and right
+    next = (Pos) {p.x - 1, p.y + offset};
+    if (getPos(next) != empty && isPosWhite(next) != isWhite) {
+        moves->push_back((Move) {p, next});
+    }
+    next = (Pos) {p.x + 1, p.y + offset};
+    if (getPos(next) != empty && isPosWhite(next) != isWhite) {
+        moves->push_back((Move) {p, next});
+    }
+}
+
+void Board::printBoard() {
+    for (int x = 0; x < 8; x++) {
+        for (int y = 0; y < 8; y++) {
+            cout << getPieceChar(b[x][y]) << " ";
+        }
+        cout << "\n";
+    }
+}
 
 int main()
 {
     Board board;
     board.resetBoard();
-    int x = board.getBoardSpot(0, 0);
-    board.getAllValidMoves();
+    
     board.printBoard();
+
+    int x1, x2, y1, y2;
+    string c;
+    while (true) {
+        cout << "From:\n";
+        cin >> x1;
+        cin >> y1;
+        cout << "To:\n";
+        cin >> x2;
+        cin >> y2;
+        cout << "{" << x1 << " " << y1 << "}, {" << x2 << " " << y2 << "}\n";
+        Move m = {{x1, y1},
+                  {x2, y2}};
+        cout << board.moveToNotation(m) << "\n";
+        if (board.isValidMove(m)) {
+            board.doMove(m);
+        }
+        else {
+            cout << "Invalid Move\n";
+        }
+
+        cout << "\n";
+        board.printBoard();
+
+        cout << "continue? (y/n): ";
+        cin >> c;
+        if (c == "n") {
+            break;
+        }
+    }
 }
