@@ -14,6 +14,13 @@ enum pieces {
     blackPawn = -6
 };
 
+enum castlingFlags {
+    whiteKingSide,
+    whiteQueenSide,
+    blackKingSide,
+    blackQueenSide
+};
+
 typedef struct {
     int x;
     int y;
@@ -22,18 +29,21 @@ typedef struct {
 typedef struct {
     Pos from;
     Pos to;
+    int flags; // used for castling and promotion
 } Move;
 
 class Board {
 private:
-    int b[8][8];
+    char b[8][8];
     bool isWhitesTurn;
     int movesPlayed;
+    bool whiteKingSideCastle, whiteQueenSideCastle, blackKingSideCastle, blackQueenSideCastle;
+    std::vector<Move> moveList;
 
 public:
     void resetBoard();
 
-    char getPieceChar(int piece);
+    std::string getPieceStr(int piece);
 
     std::string moveToNotation(Move m);
 
