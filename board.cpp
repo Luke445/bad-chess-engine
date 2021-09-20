@@ -17,10 +17,29 @@ static const char startingBoard[8][8] = {
     {whiteRook, whiteKnight, whiteBishop, whiteQueen, whiteKing, whiteBishop, whiteKnight, whiteRook}
 };
 
+Board::Board() {}
+
+Board::Board(Board *oldBoard) {
+    copyFromOtherBoard(oldBoard);
+}
+
+void Board::copyFromOtherBoard(Board *oldBoard) {
+    memcpy(b, oldBoard->b, 8 * 8 * sizeof(char));
+    isWhitesTurn = oldBoard->isWhitesTurn;
+    movesPlayed = oldBoard->movesPlayed;
+    gameStatus = oldBoard->gameStatus;
+
+    whiteKingSideCastle = oldBoard->whiteKingSideCastle;
+    whiteQueenSideCastle = oldBoard->whiteQueenSideCastle;
+    blackKingSideCastle = oldBoard->blackKingSideCastle;
+    blackQueenSideCastle = oldBoard->blackQueenSideCastle;
+}
+
 void Board::resetBoard() {
     memcpy(b, startingBoard, 8*8*sizeof(char));
     isWhitesTurn = true;
     movesPlayed = 0;
+    gameStatus = gameNotOver;
 
     whiteKingSideCastle = true;
     whiteQueenSideCastle = true;
@@ -93,17 +112,19 @@ string Board::moveToNotation(Move m) {
         out += to;
     }
 
-    // TODO: check if doing this move causes a check or checkmate
-    if (false) // checkmate
-        out += "#";
-    else if (false) // check
-        out += "+";
+    Board newBoard = Board(this);
+    int status = newBoard.doMove(m);
+    if (newBoard.isCheck()) {
+        if (status == whiteWins || status == blackWins) // checkmate
+            out += "#";
+        else // check
+            out += "+";
+    }
 
     return out;
 }
 
-void Board::doMove(Move m) {
-    // y and x reversed
+int Board::doMove(Move m) {
     int piece = getPos(m.from);
     switch (piece) {
         // check for castling
@@ -148,6 +169,7 @@ void Board::doMove(Move m) {
             // en passant
             if (m.from.x != m.to.x && getPos(m.to) == empty)
                 b[m.from.y][m.to.x] = empty;
+            // promotion
             int a;
             if (m.to.y == 0 || m.to.y == 7) {
                 switch (m.flags) {
@@ -172,16 +194,55 @@ void Board::doMove(Move m) {
             }
             break;
     }
+    // y and x reversed
     b[m.to.y][m.to.x] = piece;
     b[m.from.y][m.from.x] = empty;
     isWhitesTurn = !isWhitesTurn;
     movesPlayed++;
     moveList.push_back(m);
+
+    if (isCheck()) {
+        vector<Move> moves;
+        getAllValidMoves(&moves);
+        if (moves.size() == 0) {
+            if (isWhitesTurn)
+                gameStatus = blackWins;
+            else
+                gameStatus = whiteWins;
+        }
+    }
+    return gameStatus;
 }
 
 int Board::getPos(Pos p) {
     // y and x reversed
     return b[p.y][p.x];
+}
+
+bool Board::isCheck() {
+    Pos kingPos;
+    for (int x = 0; x < 8; x++) {
+        for (int y = 0; y < 8; y++) {
+            kingPos = (Pos) {x, y};
+            if (abs(getPos((kingPos))) == whiteKing) {
+                if (isPosWhite(kingPos) == isWhitesTurn)
+                    goto kingFound;
+            }
+        }
+    }
+    return false;
+kingFound:
+    vector<Move> moves;
+    isWhitesTurn = !isWhitesTurn;
+    getAllSimpleMoves(&moves);
+    for (Move m : moves) {
+        if (m.to.x == kingPos.x && m.to.y == kingPos.y) {
+            isWhitesTurn = !isWhitesTurn;
+            return true;
+        }
+    }
+    isWhitesTurn = !isWhitesTurn;
+    return false;
 }
 
 bool Board::isPosWhite(Pos p) {
@@ -198,21 +259,36 @@ bool Board::isValidMove(Move m) {
     return false;
 }
 
-void Board::getAllValidMoves(vector<Move> *moves) {
-    for (int i = 0; i < 8; i++) {
-        for (int j = 0; j < 8; j++) {
-            Pos next = {i, j};
+void Board::getAllSimpleMoves(vector<Move> *moves) {
+    for (int x = 0; x < 8; x++) {
+        for (int y = 0; y < 8; y++) {
+            Pos next = {x, y};
             getMovesForPiece(moves, next);
         }
     }
 }
 
+void Board::getAllValidMoves(vector<Move> *moves) {
+    getAllSimpleMoves(moves);
+
+    Board newBoard;
+    for (int i = 0; i < moves->size(); i++) {
+        newBoard.copyFromOtherBoard(this);
+        newBoard.doMove(moves->at(i));
+        newBoard.isWhitesTurn = !newBoard.isWhitesTurn;
+        if (newBoard.isCheck()) {
+            moves->erase(moves->begin() + i);
+            i--;
+        }
+    }
+}
+
 void Board::getMovesForPiece(vector<Move> *moves, Pos p) {
-    // TODO: needs to account for checks
-    int piece = getPos(p);
     // if piece color is different from current turn, return
     if (isWhitesTurn != isPosWhite(p))
         return;
+
+    int piece = getPos(p);
     // abs switches black pieces to white
     switch (abs(piece)) {
         case whiteKing:
@@ -266,7 +342,7 @@ void Board::getKingMoves(vector<Move> *moves, Pos p) {
         {
             moves->push_back((Move) {p, {p.x + 2, p.y}, whiteKingSide});
         }
-        if (whiteQueenSideCastle &&
+        else if (whiteQueenSideCastle &&
             getPos((Pos) {p.x - 1, p.y}) == empty &&
             getPos((Pos) {p.x - 2, p.y}) == empty &&
             getPos((Pos) {p.x - 3, p.y}) == empty)
@@ -281,7 +357,7 @@ void Board::getKingMoves(vector<Move> *moves, Pos p) {
         {
             moves->push_back((Move) {p, {p.x + 2, p.y}, blackKingSide});
         }
-        if (blackQueenSideCastle &&
+        else if (blackQueenSideCastle &&
             getPos((Pos) {p.x - 1, p.y}) == empty &&
             getPos((Pos) {p.x - 2, p.y}) == empty &&
             getPos((Pos) {p.x - 3, p.y}) == empty)
@@ -378,13 +454,14 @@ void Board::getPawnMoves(vector<Move> *moves, Pos p) {
     if (p.y == startingRank && getPos(next) == empty && getPos((Pos) {p.x, p.y + offset}) == empty)
         moves->push_back((Move) {p, next});
     // move 1 forward
+    // TODO: should push 4 moves for promotion
     next = (Pos) {p.x, p.y + offset};
-    if (getPos(next) == empty)
+    if (posOnBoard(next) && getPos(next) == empty)
         moves->push_back((Move) {p, next});
     // capture left and right (and en passant)
     Move lastMove = (moveList.size() == 0) ? (Move) {{0, 0}, {0, 0}} : moveList.back();
     next = (Pos) {p.x - 1, p.y + offset};
-    if ((getPos(next) != empty && isPosWhite(next) != isWhite) ||
+    if ((posOnBoard(next) && getPos(next) != empty && isPosWhite(next) != isWhite) ||
         (lastMove.to.x == p.x - 1 && lastMove.to.y == p.y &&
         lastMove.from.y == p.y + offset * 2 &&
         abs(getPos(lastMove.to)) == whitePawn)
@@ -393,7 +470,7 @@ void Board::getPawnMoves(vector<Move> *moves, Pos p) {
         moves->push_back((Move) {p, next});
     }
     next = (Pos) {p.x + 1, p.y + offset};
-    if (getPos(next) != empty && isPosWhite(next) != isWhite ||
+    if ((posOnBoard(next) && getPos(next) != empty && isPosWhite(next) != isWhite) ||
         (lastMove.to.x == p.x + 1 && lastMove.to.y == p.y &&
          lastMove.from.y == p.y + offset * 2 &&
          abs(getPos(lastMove.to)) == whitePawn)
@@ -425,6 +502,7 @@ int main() {
     board.resetBoard();
 
     int x1, x2, y1, y2;
+    int status;
     while (true) {
         board.printBoard();
 
@@ -438,8 +516,20 @@ int main() {
         cin >> y2;
         Move m = {{x1, y1},{x2, y2}};
         cout << "\n" << board.moveToNotation(m) << "\n";
-        if (board.isValidMove(m))
-            board.doMove(m);
+        if (board.isValidMove(m)) {
+            status = board.doMove(m);
+
+            if (status != gameNotOver) {
+                board.printBoard();
+                if (status == whiteWins)
+                    cout << "White Wins!\n";
+                else if (status == blackWins)
+                    cout << "Black Wins!\n";
+                else
+                    cout << "the game is a draw\n";
+                return 0;
+            }
+        }
         else
             cout << "Invalid Move\n";
 

@@ -21,6 +21,13 @@ enum castlingFlags {
     blackQueenSide
 };
 
+enum gameStatusFlags {
+    gameNotOver,
+    whiteWins,
+    blackWins,
+    draw
+};
+
 typedef struct {
     int x;
     int y;
@@ -39,21 +46,32 @@ private:
     int movesPlayed;
     bool whiteKingSideCastle, whiteQueenSideCastle, blackKingSideCastle, blackQueenSideCastle;
     std::vector<Move> moveList;
+    int gameStatus;
 
 public:
+    Board();
+
+    Board(Board *oldBoard);
+
+    void copyFromOtherBoard(Board *oldBoard);
+
     void resetBoard();
 
     std::string getPieceStr(int piece);
 
     std::string moveToNotation(Move m);
 
-    void doMove(Move m);
+    int doMove(Move m);
 
     int getPos(Pos p);
+
+    bool isCheck();
 
     bool isPosWhite(Pos p);
 
     bool isValidMove(Move m);
+
+    void getAllSimpleMoves(std::vector<Move> *moves);
 
     void getAllValidMoves(std::vector<Move> *moves);
 
