@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vector>
+#include <fstream>
 #include "board.h"
 
 using namespace std;
@@ -28,6 +29,7 @@ void Board::copyFromOtherBoard(Board *oldBoard) {
     isWhitesTurn = oldBoard->isWhitesTurn;
     movesPlayed = oldBoard->movesPlayed;
     gameStatus = oldBoard->gameStatus;
+    lastMove = oldBoard->lastMove;
 
     whiteKingSideCastle = oldBoard->whiteKingSideCastle;
     whiteQueenSideCastle = oldBoard->whiteQueenSideCastle;
@@ -40,6 +42,7 @@ void Board::resetBoard() {
     isWhitesTurn = true;
     movesPlayed = 0;
     gameStatus = gameNotOver;
+    lastMove = {};
 
     whiteKingSideCastle = true;
     whiteQueenSideCastle = true;
@@ -67,14 +70,127 @@ string Board::getPieceStr(int piece) {
     }
 }
 
+Move Board::notationToMove(string m) {
+    try {
+        // remove trailing + or #
+        if (!(m.compare(m.size() - 1, 1, "+") && m.compare(m.size() - 1, 1, "#")))
+            m = m.substr(0, m.size() - 1);
+
+        // castling
+        if (m == "O-O") {
+            if (isWhitesTurn)
+                return {{4, 7}, {6, 7}, whiteKingSide};
+            else
+                return {{4, 0}, {6, 0}, blackKingSide};
+        } else if (m == "O-O-O") {
+            if (isWhitesTurn)
+                return {{4, 7}, {2, 7}, whiteQueenSide};
+            else
+                return {{4, 0}, {2, 0}, blackQueenSide};
+        }
+
+        // check for promotion
+        if (m.compare(m.size() - 2, 1, "=") == 0) {
+            Pos to = {((char) m.at(m.size() - 4)) - 97, (8 - stoi(m.substr(m.size() - 3, 1)))};
+            int promoteTo = whiteQueen;
+            string str = m.substr(m.size() - 1, 1);
+            if (str == "R")
+                promoteTo = whiteRook;
+            else if (str == "B")
+                promoteTo = whiteBishop;
+            else if (str == "N")
+                promoteTo = whiteKnight;
+            if (to.y == 7)
+                return {{to.x, 6}, to, promoteTo};
+            else if (to.y == 0)
+                return {{to.x, 1}, to, promoteTo};
+        }
+
+        // convert notation position to coordinate (h7 -> (7, 7))
+        Pos to = {((char) m.at(m.size() - 2)) - 97, (8 - stoi(m.substr(m.size() - 1, 1)))};
+        m = m.substr(0, m.size() - 2);
+
+        // remove x denoting capture if present
+        if (m.size() != 0 && m.compare(m.size() - 1, 1, "x") == 0)
+            m = m.substr(0, m.size() - 1);
+
+        char descriptor;
+        Pos from;
+        vector <Move> moves;
+        int a;
+        // switch on remaining size
+        switch (m.size()) {
+            case 3:
+                // contains a piece name and full coordinate extra descriptor
+                from = {((char) m.at(m.size() - 2)) - 97, (8 - stoi(m.substr(m.size() - 1, 1)))};
+                return {from, to};
+            case 2:
+                // contains a piece name and either a rank or file extra descriptor
+                descriptor = m.at(m.size() - 1);
+                if (descriptor >= 97 && descriptor <= (97 + 8)) {
+                    int x = descriptor - 97;
+                    for (int y = 0; y < 8; y++) {
+                        if (getPieceStr(b[y][x]) == m.substr(0, 1)) {
+                            if (isValidMove({{x, y}, to}))
+                                return {{x, y}, to};
+                        }
+                    }
+                } else {
+                    int y = (8 - stoi(m.substr(m.size() - 1, 1)));
+                    for (int x = 0; x < 8; x++) {
+                        if (getPieceStr(b[y][x]) == m.substr(0, 1)) {
+                            if (isValidMove({{x, y}, to}))
+                                return {{x, y}, to};
+                        }
+                    }
+                }
+                break;
+            case 1:
+                // has just a piece name, or in if a pawn is capturing, a file letter
+                a = ((char) m.at(m.size() - 1)) - 97;
+                if (a >= 0 && a <= 7) {
+                    if (isWhitesTurn)
+                        return {{a, to.y + 1}, to};
+                    else
+                        return {{a, to.y - 1}, to};
+                }
+                for (int y = 0; y < 8; y++) {
+                    for (int x = 0; x < 8; x++) {
+                        if (getPieceStr(b[y][x]) == m.substr(0, 1)) {
+                            if (isValidMove({{x, y}, to}))
+                                return {{x, y}, to};
+                        }
+                    }
+                }
+            case 0:
+                // pawn push
+                if (isWhitesTurn) {
+                    if (isValidMove((Move) {{to.x, to.y + 1}, to}))
+                        return {{to.x, to.y + 1}, to};
+                    else
+                        return {{to.x, to.y + 2}, to};
+                } else {
+                    if (isValidMove((Move) {{to.x, to.y - 1}, to}))
+                        return {{to.x, to.y - 1}, to};
+                    else
+                        return {{to.x, to.y - 2}, to};
+                }
+                break;
+        }
+    }
+    catch (...) {}
+    return {};
+}
+
+//
 string Board::moveToNotation(Move m) {
     // returns a string containing the current move in PGN format
     string from, to, out;
     // change number to letter by using ascii table offset (+97) 0 -> a, 1 -> b, etc.
     from = ((char) m.from.x + 97);
-    from += to_string(m.from.y);
+    from += to_string(8 - m.from.y);
     to = ((char) m.to.x + 97);
-    to += to_string(m.to.y);
+    to += to_string(8 - m.to.y);
     bool isCapture = getPos(m.to) != empty;
     int piece = getPos(m.from);
 
@@ -122,6 +238,32 @@ string Board::moveToNotation(Move m) {
     }
 
     return out;
+}
+
+//
+void Board::exportToPGN(string filepath) {
+    // TODO: export current game to a valid .pgn file
+    ofstream f;
+    f.open(filepath);
+    if (f.is_open()) {
+        f << "[Event \"Testing\"]\n";
+        f << "[Site \"Somewhere in the US\"]\n";
+        f << "[Date \"??\"]\n";
+        f << "[Round \"0\"]\n";
+        f << "[White \"Tester, 1\"]\n";
+        f << "[Black \"Tester, 2\"]\n";
+        f << "[Result \"*\"]\n\n";
+
+        int curMove = 0;
+        /*
+        for (int i = 0; i + 1 < moveList.size(); i+=2) {
+            f << to_string(curMove) << ". " << moveToNotation(moveList.at(i)) << " " << moveToNotation(moveList.at(i + 1)) << " \n";
+            curMove += 1;
+        }*/
+    }
+    else
+        cout << "failed to open output file\n";
+    f.close();
 }
 
 int Board::doMove(Move m) {
@@ -199,9 +341,11 @@ int Board::doMove(Move m) {
     b[m.from.y][m.from.x] = empty;
     isWhitesTurn = !isWhitesTurn;
     movesPlayed++;
-    moveList.push_back(m);
+    lastMove = m;
 
     if (isCheck()) {
+        cout << "isCheck in doMove" << endl;
+        /*
         vector<Move> moves;
         getAllValidMoves(&moves);
         if (moves.size() == 0) {
@@ -209,7 +353,7 @@ int Board::doMove(Move m) {
                 gameStatus = blackWins;
             else
                 gameStatus = whiteWins;
-        }
+        }*/
     }
     return gameStatus;
 }
@@ -224,7 +368,7 @@ bool Board::isCheck() {
     for (int x = 0; x < 8; x++) {
         for (int y = 0; y < 8; y++) {
             kingPos = (Pos) {x, y};
-            if (abs(getPos((kingPos))) == whiteKing) {
+            if (abs(getPos(kingPos)) == whiteKing) {
                 if (isPosWhite(kingPos) == isWhitesTurn)
                     goto kingFound;
             }
@@ -252,6 +396,7 @@ bool Board::isPosWhite(Pos p) {
 bool Board::isValidMove(Move m) {
     vector<Move> moves;
     getMovesForPiece(&moves, m.from);
+
     for (Move x : moves) {
         if (x.to.x == m.to.x && x.to.y == m.to.y)
             return true;
@@ -285,8 +430,9 @@ void Board::getAllValidMoves(vector<Move> *moves) {
 
 void Board::getMovesForPiece(vector<Move> *moves, Pos p) {
     // if piece color is different from current turn, return
-    if (isWhitesTurn != isPosWhite(p))
+    if (isWhitesTurn != isPosWhite(p)) {
         return;
+    }
 
     int piece = getPos(p);
     // abs switches black pieces to white
@@ -323,6 +469,7 @@ bool Board::isSquareAvailable(Pos p, bool isWhite) {
     return posOnBoard(p) && (piece == 0 || (piece > 0 != isWhite));
 }
 
+//
 void Board::getKingMoves(vector<Move> *moves, Pos p) {
     bool isWhite = isPosWhite(p);
     for (int i = 0; i < 3; i++) {
@@ -404,25 +551,25 @@ void Board::getBishopMoves(vector<Move> *moves, Pos p) {
     bool isWhite = isPosWhite(p);
     for (int i = 1; ; i++) {
         Pos next = {p.x + i, p.y + i};
-        if (posOnBoard(next) && isSquareAvailable(next, isWhite)) {
+        if (isSquareAvailable(next, isWhite)) {
             moves->push_back((Move) {p, next});
         } else {break;}
     }
     for (int i = 1; ; i++) {
         Pos next = {p.x - i, p.y + i};
-        if (posOnBoard(next) && isSquareAvailable(next, isWhite)) {
+        if (isSquareAvailable(next, isWhite)) {
             moves->push_back((Move) {p, next});
         } else {break;}
     }
     for (int i = 1; ; i++) {
         Pos next = {p.x + i, p.y - i};
-        if (posOnBoard(next) && isSquareAvailable(next, isWhite)) {
+        if (isSquareAvailable(next, isWhite)) {
             moves->push_back((Move) {p, next});
         } else {break;}
     }
     for (int i = 1; ; i++) {
         Pos next = {p.x - i, p.y - i};
-        if (posOnBoard(next) && isSquareAvailable(next, isWhite)) {
+        if (isSquareAvailable(next, isWhite)) {
             moves->push_back((Move) {p, next});
         } else {break;}
     }
@@ -438,6 +585,7 @@ void Board::getKnightMoves(vector<Move> *moves, Pos p) {
     }
 }
 
+//
 void Board::getPawnMoves(vector<Move> *moves, Pos p) {
     bool isWhite = isPosWhite(p);
     int offset, startingRank;
@@ -459,7 +607,6 @@ void Board::getPawnMoves(vector<Move> *moves, Pos p) {
     if (posOnBoard(next) && getPos(next) == empty)
         moves->push_back((Move) {p, next});
     // capture left and right (and en passant)
-    Move lastMove = (moveList.size() == 0) ? (Move) {{0, 0}, {0, 0}} : moveList.back();
     next = (Pos) {p.x - 1, p.y + offset};
     if ((posOnBoard(next) && getPos(next) != empty && isPosWhite(next) != isWhite) ||
         (lastMove.to.x == p.x - 1 && lastMove.to.y == p.y &&
@@ -483,10 +630,10 @@ void Board::getPawnMoves(vector<Move> *moves, Pos p) {
 void Board::printBoard() {
     Pos p;
     string pieceStr;
-    cout << "    0 1 2 3 4 5 6 7\n";
+    cout << "    a b c d e f g h\n";
     cout << "  *----------------";
     for (p.y = 0; p.y < 8; p.y++) {
-        cout << "\n" << p.y << " | ";
+        cout << "\n" << (8 - p.y) << " | ";
         for (p.x = 0; p.x < 8; p.x++) {
             pieceStr = getPieceStr(getPos(p));
             if (!isPosWhite(p))
@@ -495,44 +642,4 @@ void Board::printBoard() {
         }
     }
     cout << "\n";
-}
-
-int main() {
-    Board board;
-    board.resetBoard();
-
-    int x1, x2, y1, y2;
-    int status;
-    while (true) {
-        board.printBoard();
-
-        cout << "From (enter -1 to exit):\n";
-        cin >> x1;
-        if (x1 == -1)
-            break;
-        cin >> y1;
-        cout << "To:\n";
-        cin >> x2;
-        cin >> y2;
-        Move m = {{x1, y1},{x2, y2}};
-        cout << "\n" << board.moveToNotation(m) << "\n";
-        if (board.isValidMove(m)) {
-            status = board.doMove(m);
-
-            if (status != gameNotOver) {
-                board.printBoard();
-                if (status == whiteWins)
-                    cout << "White Wins!\n";
-                else if (status == blackWins)
-                    cout << "Black Wins!\n";
-                else
-                    cout << "the game is a draw\n";
-                return 0;
-            }
-        }
-        else
-            cout << "Invalid Move\n";
-
-        cout << "\n";
-    }
 }

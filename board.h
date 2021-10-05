@@ -1,3 +1,7 @@
+#pragma once
+
+#include <vector>
+
 enum pieces {
     empty = 0,
     whiteKing = 1,
@@ -45,7 +49,7 @@ private:
     bool isWhitesTurn;
     int movesPlayed;
     bool whiteKingSideCastle, whiteQueenSideCastle, blackKingSideCastle, blackQueenSideCastle;
-    std::vector<Move> moveList;
+    Move lastMove;
     int gameStatus;
 
 public:
@@ -59,7 +63,11 @@ public:
 
     std::string getPieceStr(int piece);
 
+    Move notationToMove(std::string m);
+
     std::string moveToNotation(Move m);
+
+    void exportToPGN(std::string filepath);
 
     int doMove(Move m);
 
@@ -94,6 +102,6 @@ public:
     void getPawnMoves(std::vector<Move> *moves, Pos p);
 
     void printBoard();
-};
 
-int main();
+    void printBoardOld();
+};

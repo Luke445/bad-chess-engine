@@ -2,8 +2,10 @@
 
 DIR=`dirname "${BASH_SOURCE[0]}"`
 
+FLAGS='-std=c++11 -O2'
+
 if [[ -z "${OUT_DIR}" ]]; then
-	g++ $DIR/board.cpp -O2 -o "$DIR/board"
-else
-	g++ $DIR/board.cpp -O2 -o "$OUT_DIR/board"
+	OUT_DIR=$DIR
 fi
+
+g++ *.cpp $FLAGS -o "$OUT_DIR/board"
