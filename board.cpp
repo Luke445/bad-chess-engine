@@ -79,14 +79,14 @@ Move Board::notationToMove(string m) {
         // castling
         if (m == "O-O") {
             if (isWhitesTurn)
-                return {{4, 7}, {6, 7}, whiteKingSide};
+                return {{4, 7}, {6, 7}};
             else
-                return {{4, 0}, {6, 0}, blackKingSide};
+                return {{4, 0}, {6, 0}};
         } else if (m == "O-O-O") {
             if (isWhitesTurn)
-                return {{4, 7}, {2, 7}, whiteQueenSide};
+                return {{4, 7}, {2, 7}};
             else
-                return {{4, 0}, {2, 0}, blackQueenSide};
+                return {{4, 0}, {2, 0}};
         }
 
         // check for promotion
@@ -182,7 +182,7 @@ Move Board::notationToMove(string m) {
     return {};
 }
 
-//
+// missing extra descriptor
 string Board::moveToNotation(Move m) {
     // returns a string containing the current move in PGN format
     string from, to, out;
@@ -195,17 +195,19 @@ string Board::moveToNotation(Move m) {
     int piece = getPos(m.from);
 
     // castling
-    if (abs(piece) == whiteKing) {
-        switch (m.flags) {
-            case whiteKingSide:
-            case blackKingSide:
-                return "O-O";
-            case whiteQueenSide:
-            case blackQueenSide:
-                return "O-O-O";
-            default:
-                break;
-        }
+    if (piece == whiteKing) {
+        if (whiteKingSideCastle && m.to.x == 6)
+            out = "O-O";
+        else if (whiteQueenSideCastle && m.to.x == 2)
+            out = "O-O-O";
+        goto end;
+    }
+    else if (piece == blackKing) {
+        if (blackKingSideCastle && m.to.x == 6)
+            out = "O-O";
+        else if (blackQueenSideCastle && m.to.x == 2)
+            out = "O-O-O";
+        goto end;
     }
 
     if (abs(piece) == whitePawn) {
@@ -228,6 +230,7 @@ string Board::moveToNotation(Move m) {
         out += to;
     }
 
+end:
     Board newBoard = Board(this);
     int status = newBoard.doMove(m);
     if (newBoard.isCheck()) {
@@ -240,7 +243,7 @@ string Board::moveToNotation(Move m) {
     return out;
 }
 
-//
+// needs the new implementation of the moves list
 void Board::exportToPGN(string filepath) {
     // TODO: export current game to a valid .pgn file
     ofstream f;
@@ -266,16 +269,16 @@ void Board::exportToPGN(string filepath) {
     f.close();
 }
 
-int Board::doMove(Move m) {
+int Board::doMove(Move m, bool evalCheckmate) {
     int piece = getPos(m.from);
     switch (piece) {
         // check for castling
         case whiteKing:
-            if (whiteKingSideCastle && m.flags == whiteKingSide) {
+            if (whiteKingSideCastle && m.to.x == 6) {
                 b[7][5] = whiteRook;
                 b[7][7] = empty;
             }
-            else if (whiteQueenSideCastle && m.flags == whiteQueenSide) {
+            else if (whiteQueenSideCastle && m.to.x == 2) {
                 b[7][3] = whiteRook;
                 b[7][0] = empty;
             }
@@ -283,11 +286,11 @@ int Board::doMove(Move m) {
             whiteQueenSideCastle = false;
             break;
         case blackKing:
-            if (blackKingSideCastle && m.flags == blackKingSide) {
+            if (blackKingSideCastle && m.to.x == 6) {
                 b[0][5] = blackRook;
                 b[0][7] = empty;
             }
-            else if (blackQueenSideCastle && m.flags == blackQueenSide) {
+            else if (blackQueenSideCastle && m.to.x == 2) {
                 b[0][3] = blackRook;
                 b[0][0] = empty;
             }
@@ -296,9 +299,9 @@ int Board::doMove(Move m) {
             break;
         case whiteRook:
             if (m.from.x == 0)
-                blackQueenSideCastle = false;
+                whiteQueenSideCastle = false;
             else if (m.from.x == 7)
-                blackKingSideCastle = false;
+                whiteKingSideCastle = false;
             break;
         case blackRook:
             if (m.from.x == 0)
@@ -343,19 +346,22 @@ int Board::doMove(Move m) {
     movesPlayed++;
     lastMove = m;
 
-    if (isCheck()) {
-        cout << "isCheck in doMove" << endl;
-        /*
-        vector<Move> moves;
-        getAllValidMoves(&moves);
-        if (moves.size() == 0) {
-            if (isWhitesTurn)
-                gameStatus = blackWins;
-            else
-                gameStatus = whiteWins;
-        }*/
+    if (evalCheckmate) {
+        if (isCheck()) {
+            vector<Move> moves;
+            getAllValidMoves(&moves);
+            if (moves.size() == 0) {
+                if (isWhitesTurn)
+                    gameStatus = blackWins;
+                else
+                    gameStatus = whiteWins;
+            }
+        }
+
+        return gameStatus;
     }
-    return gameStatus;
+    else
+        return gameNotOver;
 }
 
 int Board::getPos(Pos p) {
@@ -397,10 +403,17 @@ bool Board::isValidMove(Move m) {
     vector<Move> moves;
     getMovesForPiece(&moves, m.from);
 
+    Board newBoard;
     for (Move x : moves) {
-        if (x.to.x == m.to.x && x.to.y == m.to.y)
-            return true;
+        newBoard.copyFromOtherBoard(this);
+        newBoard.doMove(x, false);
+        newBoard.isWhitesTurn = !newBoard.isWhitesTurn;
+        if (!newBoard.isCheck()) {
+            if (x.to.x == m.to.x && x.to.y == m.to.y)
+                return true;
+        }
     }
+
     return false;
 }
 
@@ -419,7 +432,7 @@ void Board::getAllValidMoves(vector<Move> *moves) {
     Board newBoard;
     for (int i = 0; i < moves->size(); i++) {
         newBoard.copyFromOtherBoard(this);
-        newBoard.doMove(moves->at(i));
+        newBoard.doMove(moves->at(i), false);
         newBoard.isWhitesTurn = !newBoard.isWhitesTurn;
         if (newBoard.isCheck()) {
             moves->erase(moves->begin() + i);
@@ -469,13 +482,13 @@ bool Board::isSquareAvailable(Pos p, bool isWhite) {
     return posOnBoard(p) && (piece == 0 || (piece > 0 != isWhite));
 }
 
-//
+// castle through / out of checks
 void Board::getKingMoves(vector<Move> *moves, Pos p) {
     bool isWhite = isPosWhite(p);
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            if (i != 0 && j != 0) {
-                Pos next = {i, j};
+    for (int i = -1; i < 2; i++) {
+        for (int j = -1; j < 2; j++) {
+            if (i != 0 || j != 0) {
+                Pos next = {p.x + i, p.y + j};
                 if (isSquareAvailable(next, isWhite))
                     moves->push_back((Move) {p, next});
             }
@@ -487,14 +500,14 @@ void Board::getKingMoves(vector<Move> *moves, Pos p) {
             getPos((Pos) {p.x + 1, p.y}) == empty &&
             getPos((Pos) {p.x + 2, p.y}) == empty)
         {
-            moves->push_back((Move) {p, {p.x + 2, p.y}, whiteKingSide});
+            moves->push_back((Move) {p, {p.x + 2, p.y}});
         }
         else if (whiteQueenSideCastle &&
             getPos((Pos) {p.x - 1, p.y}) == empty &&
             getPos((Pos) {p.x - 2, p.y}) == empty &&
             getPos((Pos) {p.x - 3, p.y}) == empty)
         {
-            moves->push_back((Move) {p, {p.x - 2, p.y}, whiteQueenSide});
+            moves->push_back((Move) {p, {p.x - 2, p.y}});
         }
     }
     else {
@@ -502,14 +515,14 @@ void Board::getKingMoves(vector<Move> *moves, Pos p) {
             getPos((Pos) {p.x + 1, p.y}) == empty &&
             getPos((Pos) {p.x + 2, p.y}) == empty)
         {
-            moves->push_back((Move) {p, {p.x + 2, p.y}, blackKingSide});
+            moves->push_back((Move) {p, {p.x + 2, p.y}});
         }
         else if (blackQueenSideCastle &&
             getPos((Pos) {p.x - 1, p.y}) == empty &&
             getPos((Pos) {p.x - 2, p.y}) == empty &&
             getPos((Pos) {p.x - 3, p.y}) == empty)
         {
-            moves->push_back((Move) {p, {p.x - 2, p.y}, blackQueenSide});
+            moves->push_back((Move) {p, {p.x - 2, p.y}});
         }
     }
 }
@@ -525,24 +538,32 @@ void Board::getRookMoves(vector<Move> *moves, Pos p) {
         Pos next = {p.x + i, p.y};
         if (isSquareAvailable(next, isWhite)) {
             moves->push_back((Move) {p, next});
+            if (getPos(next) != empty)
+                break;
         } else {break;}
     }
     for (int i = 1; p.x - i < 8; i++) {
         Pos next = {p.x - i, p.y};
         if (isSquareAvailable(next, isWhite)) {
             moves->push_back((Move) {p, next});
+            if (getPos(next) != empty)
+                break;
         } else {break;}
     }
     for (int i = 1; p.y + i < 8; i++) {
-        Pos next = {p.x, p.y - i};
+        Pos next = {p.x, p.y + i};
         if (isSquareAvailable(next, isWhite)) {
             moves->push_back((Move) {p, next});
+            if (getPos(next) != empty)
+                break;
         } else {break;}
     }
     for (int i = 1; p.y - i < 8; i++) {
         Pos next = {p.x, p.y - i};
         if (isSquareAvailable(next, isWhite)) {
             moves->push_back((Move) {p, next});
+            if (getPos(next) != empty)
+                break;
         } else {break;}
     }
 }
@@ -553,24 +574,32 @@ void Board::getBishopMoves(vector<Move> *moves, Pos p) {
         Pos next = {p.x + i, p.y + i};
         if (isSquareAvailable(next, isWhite)) {
             moves->push_back((Move) {p, next});
+            if (getPos(next) != empty)
+                break;
         } else {break;}
     }
     for (int i = 1; ; i++) {
         Pos next = {p.x - i, p.y + i};
         if (isSquareAvailable(next, isWhite)) {
             moves->push_back((Move) {p, next});
+            if (getPos(next) != empty)
+                break;
         } else {break;}
     }
     for (int i = 1; ; i++) {
         Pos next = {p.x + i, p.y - i};
         if (isSquareAvailable(next, isWhite)) {
             moves->push_back((Move) {p, next});
+            if (getPos(next) != empty)
+                break;
         } else {break;}
     }
     for (int i = 1; ; i++) {
         Pos next = {p.x - i, p.y - i};
         if (isSquareAvailable(next, isWhite)) {
             moves->push_back((Move) {p, next});
+            if (getPos(next) != empty)
+                break;
         } else {break;}
     }
 }
@@ -585,7 +614,7 @@ void Board::getKnightMoves(vector<Move> *moves, Pos p) {
     }
 }
 
-//
+// push extra moves for promotion
 void Board::getPawnMoves(vector<Move> *moves, Pos p) {
     bool isWhite = isPosWhite(p);
     int offset, startingRank;
@@ -642,4 +671,86 @@ void Board::printBoard() {
         }
     }
     cout << "\n";
+}
+
+void Board::printBoardGui() {
+    Pos p;
+    string pieceStr;
+    cout << "----- NEW BOARD -----\n";
+    for (p.y = 0; p.y < 8; p.y++) {
+        for (p.x = 0; p.x < 8; p.x++) {
+            pieceStr = getPieceStr(getPos(p));
+            if (!isPosWhite(p))
+                pieceStr = tolower((char) pieceStr[0]);
+            cout << pieceStr << "-";
+        }
+        cout << "\n";
+    }
+}
+
+int Board::getPieceValue(int piece) {
+    if (piece == empty)
+        return 0;
+
+    int value;
+    switch (abs(piece)) {
+        case whiteQueen:
+            value = 9;
+            break;
+        case whiteRook:
+            value = 5;
+            break;
+        case whiteBishop:
+            value = 3;
+            break;
+        case whiteKnight:
+            value = 3;
+            break;
+        case whitePawn:
+            value = 1;
+            break;
+    }
+
+    if (piece < 0)
+        return -value;
+    else
+        return value;
+}
+
+int Board::getMaterialDiff() {
+    int sum = 0;
+    for (int x = 0; x < 8; x++) {
+        for (int y = 0; y < 8; y++) {
+            sum += getPieceValue(getPos((Pos) {x, y}));
+        }
+    }
+    return sum;
+}
+
+int Board::getWhitesMaterial() {
+    int sum = 0;
+    int piece;
+    Pos next;
+    for (int x = 0; x < 8; x++) {
+        for (int y = 0; y < 8; y++) {
+            next = (Pos) {x, y};
+            if (isPosWhite(next))
+                sum += getPieceValue(getPos(next));
+        }
+    }
+    return sum;
+}
+
+int Board::getBlacksMaterial() {
+    int sum = 0;
+    int piece;
+    Pos next;
+    for (int x = 0; x < 8; x++) {
+        for (int y = 0; y < 8; y++) {
+            next = (Pos) {x, y};
+            if (!isPosWhite(next))
+                sum += getPieceValue(getPos(next));
+        }
+    }
+    return sum;
 }

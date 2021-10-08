@@ -18,13 +18,6 @@ enum pieces {
     blackPawn = -6
 };
 
-enum castlingFlags {
-    whiteKingSide,
-    whiteQueenSide,
-    blackKingSide,
-    blackQueenSide
-};
-
 enum gameStatusFlags {
     gameNotOver,
     whiteWins,
@@ -69,7 +62,7 @@ public:
 
     void exportToPGN(std::string filepath);
 
-    int doMove(Move m);
+    int doMove(Move m, bool evalCheckmate=true);
 
     int getPos(Pos p);
 
@@ -103,5 +96,13 @@ public:
 
     void printBoard();
 
-    void printBoardOld();
+    void printBoardGui();
+
+    int getPieceValue(int piece);
+
+    int getMaterialDiff();
+
+    int getWhitesMaterial();
+
+    int getBlacksMaterial();
 };
