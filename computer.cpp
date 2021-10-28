@@ -1,4 +1,5 @@
 #include <iostream>
+#include <random>
 #include "board.h"
 #include "computer.h"
 
@@ -6,7 +7,6 @@ using namespace std;
 
 ComputerBoard::ComputerBoard() {
     mainBoard.resetBoard();
-    srand(time(NULL));
 }
 
 int ComputerBoard::doComputerMove() {
@@ -32,12 +32,13 @@ Move ComputerBoard::selectRandomMove(vector<Move> *moves) {
 }
 
 Move ComputerBoard::bruteForce(int depth) {
-    vector<Move> *moves = mainBoard.getAllValidMoves();
+    vector<Move> moves(*mainBoard.getAllValidMoves());
+    shuffle(moves.begin(), moves.end(), random_device());
     Board b;
-    Move bestMove;
+    Move bestMove = moves[0];
     int bestScore = 1000;
     int value;
-    for (Move m : *moves) {
+    for (Move m : moves) {
         b.copyFromOtherBoard(&mainBoard);
         b.doMove(m);
         value = evalPos(&b, depth - 1, -1000, 1000);
