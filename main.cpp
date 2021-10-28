@@ -1,5 +1,7 @@
 #include <iostream>
+#include <thread>
 #include "computer.h"
+#include "gui.h"
 
 using namespace std;
 
@@ -19,26 +21,22 @@ Move getPlayerMove(Board *board) {
     cout << "Enter Move (enter q to quit):\n";
     cin >> move;
     if (move == "q")
-        return {{-1, -1}, {-1, -1}};
+        return {-1, -1, -1};
 
-    m = board->notationToMove(move);
+    // TODO: m = board->notationToMove(move);
 
     return m;
 }
 
-Move getPlayerMoveGui() {
-    string move;
+Move getPlayerMoveGui(Move *sharedMove) {
+    while (sharedMove->from == -1 || sharedMove->to == -1 || sharedMove->flags == -1) {
+        this_thread::sleep_for(chrono::milliseconds(1));
+    }
 
-    cout << "Enter Move (enter q to quit):\n";
-    cin >> move;
-    if (move == "q")
-        return {{-1, -1}, {-1, -1}};
+    this_thread::sleep_for(chrono::milliseconds(1));
 
-    Move m = (Move) {
-        {stoi(move.substr(0, 1)), stoi(move.substr(1, 1))},
-        {stoi(move.substr(2, 1)), stoi(move.substr(3, 1))},
-        stoi(move.substr(4, 1))
-    };
+    Move m = *sharedMove;
+    *sharedMove = {-1, -1, -1};
 
     return m;
 }
@@ -51,14 +49,13 @@ void playWithComputer() {
         com.mainBoard.printBoard();
 
         m = getPlayerMove(&com.mainBoard);
-        if (m.to.x == -1)
+        if (m.to == -1)
             break;
 
-        cout << "{" << m.from.x << ", " << m.from.y << "} {" << m.to.x << ", " << m.to.y << "}\n";
+        cout << m.from << ", " << m.to << "\n";
 
         status = com.submitPlayerMove(m);
         if (status != gameNotOver) {
-            com.mainBoard.printBoardGui();
             if (status == -1) {
                 cout << "\n";
                 continue;
@@ -71,7 +68,6 @@ void playWithComputer() {
 
         status = com.doComputerMove();
         if (status != gameNotOver) {
-            com.mainBoard.printBoardGui();
             if (status == -1) {
                 cout << "Invalid Com Move\n";
                 break;
@@ -84,33 +80,25 @@ void playWithComputer() {
     }
 }
 
-void playWithComputerGui() {
+void playWithComputerGui(ComputerBoard *com, Move *sharedMove) {
     Move m;
     int status;
-    ComputerBoard com = ComputerBoard();
     while (true) {
-        com.mainBoard.printBoardGui();
-
-        m = getPlayerMoveGui();
-        if (m.to.x == -1)
+        m = getPlayerMoveGui(sharedMove);
+        if (m.to == -1)
             break;
 
-        status = com.submitPlayerMove(m);
+        status = com->submitPlayerMove(m);
         if (status != gameNotOver) {
-            com.mainBoard.printBoardGui();
             if (status == -1) {
-                cout << "Invalid Move\n";
                 continue;
             }
             printStatus(status);
             break;
         }
 
-        com.mainBoard.printBoardGui();
-
-        status = com.doComputerMove();
+        status = com->doComputerMove();
         if (status != gameNotOver) {
-            com.mainBoard.printBoardGui();
             if (status == -1) {
                 cout << "Invalid Com Move\n";
                 break;
@@ -121,22 +109,20 @@ void playWithComputerGui() {
     }
 }
 
+void createThreads() {
+    ComputerBoard com = ComputerBoard();
+    Board *b = &com.mainBoard;
+    Move sharedMove = {-1, -1, -1};
+    thread test(playWithComputerGui, &com, &sharedMove);
+    Gui g = Gui(b, &sharedMove);
+    g.runGui();
+}
+
 int main(int argc, char *argv[]) {
-    bool guiMode = false;
-    if (argc >= 2 && strcmp(argv[1], "--gui") == 0) {
-        guiMode = true;
-    }
-
-    if (guiMode)
-        playWithComputerGui();
-    else
+    if (argc >= 2 && strcmp(argv[1], "--nogui") == 0)
         playWithComputer();
-
-    /*
-    cout << "save game (y/n): ";
-    cin >> input;
-    if (input == "y")
-        board.exportToPGN("~/Documents/game.pgn");*/
+    else
+        createThreads();
 
     return 0;
 }

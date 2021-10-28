@@ -3,7 +3,7 @@
 #include <vector>
 
 enum pieces {
-    empty = 0,
+    noPiece = 0,
     whiteKing = 1,
     whiteQueen = 2,
     whiteRook = 3,
@@ -25,25 +25,21 @@ enum gameStatusFlags {
     draw
 };
 
-typedef struct {
-    int x;
-    int y;
-} Pos;
-
-typedef struct {
-    Pos from;
-    Pos to;
-    int flags; // used for castling and promotion
-} Move;
+struct Move {
+    char from;
+    char to;
+    char flags; // used for castling and promotion
+};
 
 class Board {
 private:
-    char b[8][8];
+    char b[64];
     bool isWhitesTurn;
     int movesPlayed;
     bool whiteKingSideCastle, whiteQueenSideCastle, blackKingSideCastle, blackQueenSideCastle;
     Move lastMove;
     int gameStatus;
+    std::vector<Move> validMoves;
 
 public:
     Board();
@@ -64,39 +60,37 @@ public:
 
     int doMove(Move m, bool evalCheckmate=true);
 
-    int getPos(Pos p);
+    int getPos(char pos);
 
     bool isCheck();
 
-    bool isPosWhite(Pos p);
+    bool isPosWhite(char pos);
 
     bool isValidMove(Move m);
 
     void getAllSimpleMoves(std::vector<Move> *moves);
 
-    void getAllValidMoves(std::vector<Move> *moves);
+    std::vector<Move> * getAllValidMoves();
 
-    void getMovesForPiece(std::vector<Move> *moves, Pos p);
+    void getMovesForPiece(std::vector<Move> *moves, char pos);
 
-    bool posOnBoard(Pos p);
+    bool posOnBoard(char pos);
 
-    bool isSquareAvailable(Pos p, bool isWhite);
+    bool isSquareAvailable(char pos, bool isWhite);
 
-    void getKingMoves(std::vector<Move> *moves, Pos p);
+    void getKingMoves(std::vector<Move> *moves, char pos);
 
-    void getQueenMoves(std::vector<Move> *moves, Pos p);
+    void getQueenMoves(std::vector<Move> *moves, char pos);
 
-    void getRookMoves(std::vector<Move> *moves, Pos p);
+    void getRookMoves(std::vector<Move> *moves, char pos);
 
-    void getBishopMoves(std::vector<Move> *moves, Pos p);
+    void getBishopMoves(std::vector<Move> *moves, char pos);
 
-    void getKnightMoves(std::vector<Move> *moves, Pos p);
+    void getKnightMoves(std::vector<Move> *moves, char pos);
 
-    void getPawnMoves(std::vector<Move> *moves, Pos p);
+    void getPawnMoves(std::vector<Move> *moves, char pos);
 
     void printBoard();
-
-    void printBoardGui();
 
     int getPieceValue(int piece);
 
@@ -105,4 +99,10 @@ public:
     int getWhitesMaterial();
 
     int getBlacksMaterial();
+
+    Move getLastMove();
+
+    bool getIsWhitesTurn();
+
+    int getStatus();
 };
