@@ -1,16 +1,24 @@
 #include <iostream>
 #include <random>
-#include "board.h"
-#include "computer.h"
+#include "Board.h"
+#include "Computer.h"
 
 using namespace std;
+using namespace std::chrono;
 
 ComputerBoard::ComputerBoard() {
     mainBoard.resetBoard();
 }
 
 int ComputerBoard::doComputerMove() {
+    auto start = high_resolution_clock::now();
+    // change depth here
     Move m = bruteForce(4);
+    auto stop = high_resolution_clock::now();
+
+    auto duration = duration_cast<milliseconds>(stop - start);
+
+    // cout << "doComputerMove time: " << duration.count() << "ms" << endl;
 
     return mainBoard.doMove(m);
 }
@@ -32,13 +40,14 @@ Move ComputerBoard::selectRandomMove(vector<Move> *moves) {
 }
 
 Move ComputerBoard::bruteForce(int depth) {
-    vector<Move> moves(*mainBoard.getAllValidMoves());
-    shuffle(moves.begin(), moves.end(), random_device());
+    vector<Move> *moves = mainBoard.getAllValidMoves();
+    // randomizes moves with the same score
+    shuffle(moves->begin(), moves->end(), random_device());
     Board b;
-    Move bestMove = moves[0];
+    Move bestMove = moves->at(0);
     int bestScore = 1000;
     int value;
-    for (Move m : moves) {
+    for (Move m : *moves) {
         b.copyFromOtherBoard(&mainBoard);
         b.doMove(m);
         value = evalPos(&b, depth - 1, -1000, 1000);
@@ -50,6 +59,10 @@ Move ComputerBoard::bruteForce(int depth) {
     return bestMove;
 }
 
+int ComputerBoard::scoreBoard(Board *b) {
+    return b->getMaterialDiff();
+}
+
 /*
  * implements an alpha-beta algorithm that scores the
  * given position based on material difference
@@ -57,7 +70,7 @@ Move ComputerBoard::bruteForce(int depth) {
  */
 int ComputerBoard::evalPos(Board *startingBoard, int depth, int alpha, int beta) {
     if (depth == 0)
-        return startingBoard->getMaterialDiff();
+        return scoreBoard(startingBoard);
 
     vector<Move> *moves = startingBoard->getAllValidMoves();
     if (moves->size() == 0)

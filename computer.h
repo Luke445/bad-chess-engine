@@ -1,8 +1,8 @@
-#include "board.h"
+#include "EnhancedBoard.h"
 
 class ComputerBoard {
 public:
-    Board mainBoard;
+    EnhancedBoard mainBoard;
 
     ComputerBoard();
 
@@ -13,6 +13,8 @@ public:
     Move selectRandomMove(std::vector<Move> *moves);
 
     Move bruteForce(int depth);
+
+    int scoreBoard(Board *b);
 
     int evalPos(Board *startingBoard, int depth, int min, int max);
 };

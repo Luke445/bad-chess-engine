@@ -1,8 +1,8 @@
 #include <iostream>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
-#include "board.h"
-#include "gui.h"
+#include "Board.h"
+#include "Gui.h"
 
 using namespace std;
 
@@ -28,7 +28,7 @@ const char *FILENAMES[] = {
 };
 
 
-Gui::Gui(Board *board, Move *m) {
+Gui::Gui(EnhancedBoard *board, Move *m) {
     b = board;
     sharedMove = m;
     lastMove = b->getLastMove();

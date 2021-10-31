@@ -1,6 +1,6 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
-#include "board.h"
+#include "EnhancedBoard.h"
 
 class Gui {
 private:
@@ -19,7 +19,7 @@ private:
 
 
 public:
-    Gui(Board *board, Move *m);
+    Gui(EnhancedBoard *board, Move *m);
 
     void drawCircle(int centerX, int centerY, int radius);
 

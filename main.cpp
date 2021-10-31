@@ -1,7 +1,8 @@
 #include <iostream>
 #include <thread>
-#include "computer.h"
-#include "gui.h"
+#include "Computer.h"
+#include "EnhancedBoard.h"
+#include "Gui.h"
 
 using namespace std;
 
@@ -14,7 +15,7 @@ void printStatus(int status) {
         cout << "The game is a draw\n";
 }
 
-Move getPlayerMove(Board *board) {
+Move getPlayerMove(EnhancedBoard *board) {
     string move;
     Move m;
 
@@ -23,7 +24,7 @@ Move getPlayerMove(Board *board) {
     if (move == "q")
         return {-1, -1, -1};
 
-    // TODO: m = board->notationToMove(move);
+    m = board->notationToMove(move);
 
     return m;
 }
@@ -111,7 +112,7 @@ void playWithComputerGui(ComputerBoard *com, Move *sharedMove) {
 
 void createThreads() {
     ComputerBoard com = ComputerBoard();
-    Board *b = &com.mainBoard;
+    EnhancedBoard *b = &com.mainBoard;
     Move sharedMove = {-1, -1, -1};
     thread test(playWithComputerGui, &com, &sharedMove);
     Gui g = Gui(b, &sharedMove);

@@ -50,25 +50,31 @@ public:
 
     void resetBoard();
 
-    std::string getPieceStr(int piece);
-
-    Move notationToMove(std::string m);
-
-    std::string moveToNotation(Move m);
-
-    void exportToPGN(std::string filepath);
-
     int doMove(Move m, bool evalCheckmate=true);
 
     int getPos(char pos);
 
     bool isCheck();
 
+    bool doesKingAttackKing(char pos, char otherKingPos);
+
+    bool doesQueenAttackKing(char pos, char kingPos);
+
+    bool doesRookAttackKing(char pos, char kingPos);
+
+    bool doesBishopAttackKing(char pos, char kingPos);
+
+    bool doesKnightAttackKing(char pos, char kingPos);
+
+    bool doesPawnAttackKing(char pos, char kingPos);
+
     bool isPosWhite(char pos);
 
     bool isValidMove(Move m);
 
     void getAllSimpleMoves(std::vector<Move> *moves);
+
+    bool isPosAttacked(char pos);
 
     std::vector<Move> * getAllValidMoves();
 
@@ -90,15 +96,9 @@ public:
 
     void getPawnMoves(std::vector<Move> *moves, char pos);
 
-    void printBoard();
-
     int getPieceValue(int piece);
 
     int getMaterialDiff();
-
-    int getWhitesMaterial();
-
-    int getBlacksMaterial();
 
     Move getLastMove();
 
