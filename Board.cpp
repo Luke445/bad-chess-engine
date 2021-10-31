@@ -198,9 +198,11 @@ bool Board::doesKingAttackKing(char pos, char otherKingPos) {
         for (int j = -1; j < 2; j++) {
             if (i != 0 || j != 0) {
                 next = pos + (i * 8) + j;
-                if (abs((next & 0b111) - (pos & 0b111)) <= 1) {
-                    if (isSquareAvailable(next, isWhite))
-                        if (otherKingPos == next) {return true;}
+                if (otherKingPos == next) {
+                    if (abs((next & 0b111) - (pos & 0b111)) <= 1) {
+                        if (isSquareAvailable(next, isWhite))
+                            return true;
+                    }
                 }
             }
         }
@@ -289,9 +291,11 @@ bool Board::doesKnightAttackKing(char pos, char kingPos) {
     char next;
     for (int i = 0; i < 8; i++) {
         next = pos + knightOffsets[i];
-        if (abs((next & 0b111) - (pos & 0b111)) <= 2) {
-            if (isSquareAvailable(next, isWhite))
-                if (kingPos == next) {return true;}
+        if (kingPos == next) {
+            if (abs((next & 0b111) - (pos & 0b111)) <= 2) {
+                if (isSquareAvailable(next, isWhite))
+                   return true;
+            }
         }
     }
     return false;
@@ -305,7 +309,7 @@ bool Board::doesPawnAttackKing(char pos, char kingPos) {
     else
         offset = 8;
 
-    // capture left and right (not possible for en passant to also capture other piece
+    // capture left and right (not possible for en passant to also capture other piece)
     if ((pos & 0b111) != 0) {
         next = pos + offset - 1;
         if (getPos(next) != noPiece && isPosWhite(next) != isWhite)
@@ -319,33 +323,15 @@ bool Board::doesPawnAttackKing(char pos, char kingPos) {
     return false;
 }
 
-bool Board::isPosAttacked(char pos) {
-    bool isWhite = isPosWhite(pos);
-    for (char i = 0; i < 64; i++) {
-        if (isPosWhite(pos) != isWhite) {
-            return true;
-        }
-    }
-    return false;
-}
-
 bool Board::isPosWhite(char pos) {
     return getPos(pos) > 0;
 }
 
 bool Board::isValidMove(Move m) {
-    vector<Move> moves;
-    getMovesForPiece(&moves, m.from);
-
-    Board newBoard;
-    for (Move x : moves) {
-        newBoard.copyFromOtherBoard(this);
-        newBoard.doMove(x, true);
-        newBoard.isWhitesTurn = !newBoard.isWhitesTurn;
-        if (!newBoard.isCheck()) {
-            if (x.to == m.to)
-                return true;
-        }
+    vector<Move> *moves = getAllValidMoves();
+    for (Move x : *moves) {
+        if (x.to == m.to && x.from == m.from)
+            return true;
     }
 
     return false;

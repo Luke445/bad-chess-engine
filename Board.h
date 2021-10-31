@@ -74,8 +74,6 @@ public:
 
     void getAllSimpleMoves(std::vector<Move> *moves);
 
-    bool isPosAttacked(char pos);
-
     std::vector<Move> * getAllValidMoves();
 
     void getMovesForPiece(std::vector<Move> *moves, char pos);
