@@ -18,7 +18,7 @@ int ComputerBoard::doComputerMove() {
 
     auto duration = duration_cast<milliseconds>(stop - start);
 
-    cout << "doComputerMove time: " << duration.count() << "ms" << endl;
+    // cout << "doComputerMove time: " << duration.count() << "ms" << endl;
 
     return mainBoard.doMove(m);
 }
@@ -90,12 +90,13 @@ int ComputerBoard::evalPos(Board *startingBoard, int depth, int alpha, int beta)
         return 0;
 
     Board b;
+    Move bestMove = moves->at(0);
+    int status, value;
     if (startingBoard->getIsWhitesTurn()) {
-        int value = -1000;
-        Move bestMove = moves->at(0);
+        value = -1000;
         for (Move m : *moves) {
             b.copyFromOtherBoard(startingBoard);
-            int status = b.doMove(m);
+            status = b.doMove(m);
             if (status != gameNotOver)
                 value = setValueFromStatus(status);
             else
@@ -108,11 +109,10 @@ int ComputerBoard::evalPos(Board *startingBoard, int depth, int alpha, int beta)
         return value;
     }
     else {
-        int value = 1000;
-        Move bestMove = moves->at(0);
+        value = 1000;
         for (Move m : *moves) {
             b.copyFromOtherBoard(startingBoard);
-            int status = b.doMove(m);
+            status = b.doMove(m);
             if (status != gameNotOver)
                 value = setValueFromStatus(status);
             else

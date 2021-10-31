@@ -6,6 +6,8 @@
 
 using namespace std;
 
+bool done = false;
+
 void printStatus(int status) {
     if (status == whiteWins)
         cout << "White Wins!\n";
@@ -32,9 +34,9 @@ Move getPlayerMove(EnhancedBoard *board) {
 Move getPlayerMoveGui(Move *sharedMove) {
     while (sharedMove->from == -1 || sharedMove->to == -1 || sharedMove->flags == -1) {
         this_thread::sleep_for(chrono::milliseconds(1));
+        if (done)
+            return {-1, -1, -1};
     }
-
-    this_thread::sleep_for(chrono::milliseconds(1));
 
     Move m = *sharedMove;
     *sharedMove = {-1, -1, -1};
@@ -117,6 +119,9 @@ void createThreads() {
     thread test(playWithComputerGui, &com, &sharedMove);
     Gui g = Gui(b, &sharedMove);
     g.runGui();
+
+    done = true;
+    test.join();
 }
 
 int main(int argc, char *argv[]) {
