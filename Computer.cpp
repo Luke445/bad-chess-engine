@@ -18,7 +18,7 @@ int ComputerBoard::doComputerMove() {
 
     auto duration = duration_cast<milliseconds>(stop - start);
 
-    // cout << "doComputerMove time: " << duration.count() << "ms" << endl;
+    cout << "doComputerMove time: " << duration.count() << "ms" << endl;
 
     return mainBoard.doMove(m);
 }
@@ -39,18 +39,31 @@ Move ComputerBoard::selectRandomMove(vector<Move> *moves) {
     return moves->at(index);
 }
 
+int ComputerBoard::setValueFromStatus(int status) {
+    if (status == whiteWins)
+        return 1000;
+    else if (status == blackWins)
+        return -1000;
+    else
+        return 0;
+}
+
 Move ComputerBoard::bruteForce(int depth) {
     vector<Move> *moves = mainBoard.getAllValidMoves();
-    // randomizes moves with the same score
+    // randomize moves with the same score
     shuffle(moves->begin(), moves->end(), random_device());
     Board b;
     Move bestMove = moves->at(0);
     int bestScore = 1000;
-    int value;
+    int value, status;
     for (Move m : *moves) {
         b.copyFromOtherBoard(&mainBoard);
-        b.doMove(m);
-        value = evalPos(&b, depth - 1, -1000, 1000);
+        status = b.doMove(m);
+        if (status != gameNotOver)
+            value = setValueFromStatus(status);
+        else
+            value = evalPos(&b, depth - 1, -1000, 1000);
+
         if (value < bestScore) {
             bestScore = value;
             bestMove = m;
@@ -83,16 +96,11 @@ int ComputerBoard::evalPos(Board *startingBoard, int depth, int alpha, int beta)
         for (Move m : *moves) {
             b.copyFromOtherBoard(startingBoard);
             int status = b.doMove(m);
-            if (status != gameNotOver) {
-                if (status == whiteWins)
-                    value = 1000;
-                else if (status == blackWins)
-                    value = -1000;
-                else
-                    value = 0;
-            }
+            if (status != gameNotOver)
+                value = setValueFromStatus(status);
             else
                 value = max(value, evalPos(&b, depth - 1, alpha, beta));
+
             alpha = max(alpha, value);
             if (value >= beta)
                 break;
@@ -105,16 +113,11 @@ int ComputerBoard::evalPos(Board *startingBoard, int depth, int alpha, int beta)
         for (Move m : *moves) {
             b.copyFromOtherBoard(startingBoard);
             int status = b.doMove(m);
-            if (status != gameNotOver) {
-                if (status == whiteWins)
-                    value = 1000;
-                else if (status == blackWins)
-                    value = -1000;
-                else
-                    value = 0;
-            }
+            if (status != gameNotOver)
+                value = setValueFromStatus(status);
             else
                 value = min(value, evalPos(&b, depth - 1, alpha, beta));
+
             beta = min(beta, value);
             if (value <= alpha)
                 break;

@@ -12,6 +12,8 @@ public:
 
     Move selectRandomMove(std::vector<Move> *moves);
 
+    int setValueFromStatus(int status);
+
     Move bruteForce(int depth);
 
     int scoreBoard(Board *b);

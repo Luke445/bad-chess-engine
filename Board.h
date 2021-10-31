@@ -28,11 +28,11 @@ enum gameStatusFlags {
 struct Move {
     char from;
     char to;
-    char flags; // used for castling and promotion
+    char flags; // used for promotion
 };
 
 class Board {
-private:
+protected:
     char b[64];
     bool isWhitesTurn;
     int movesPlayed;

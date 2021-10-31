@@ -128,7 +128,7 @@ void Gui::drawChessBoard() {
         vector<Move> *moves = b->getAllValidMoves();
         for (Move m : *moves) {
             if (m.from == selectedPos) {
-                drawCircle((m.to % 8) * BOX_WIDTH + BOX_WIDTH_CENTER, ((int) (m.to / 8)) * BOX_HEIGHT + BOX_HEIGHT_CENTER, CIRCLE_RADIUS);
+                drawCircle((m.to & 0b111) * BOX_WIDTH + BOX_WIDTH_CENTER, ((m.to >> 3) * BOX_HEIGHT + BOX_HEIGHT_CENTER), CIRCLE_RADIUS);
             }
         }
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);

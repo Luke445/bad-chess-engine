@@ -24,19 +24,6 @@ string EnhancedBoard::getPieceStr(int piece) {
 }
 
 Move EnhancedBoard::notationToMove(string m) {
-    return {};
-}
-
-string EnhancedBoard::moveToNotation(Move m) {
-    return "";
-}
-
-void EnhancedBoard::exportToPGN(string filepath) {
-    return;
-}
-
-/*
-Move EnhancedBoard::notationToMove(string m) {
     try {
         // remove trailing + or #
         if (!(m.compare(m.size() - 1, 1, "+") && m.compare(m.size() - 1, 1, "#")))
@@ -45,16 +32,17 @@ Move EnhancedBoard::notationToMove(string m) {
         // castling
         if (m == "O-O") {
             if (isWhitesTurn)
-                return {{4, 7}, {6, 7}};
+                return {39, 55};
             else
-                return {{4, 0}, {6, 0}};
+                return {32, 48};
         } else if (m == "O-O-O") {
             if (isWhitesTurn)
-                return {{4, 7}, {2, 7}};
+                return {39, 23};
             else
-                return {{4, 0}, {2, 0}};
+                return {32, 16};
         }
 
+        /*
         // check for promotion
         if (m.compare(m.size() - 2, 1, "=") == 0) {
             Pos to = {((char) m.at(m.size() - 4)) - 97, (8 - stoi(m.substr(m.size() - 3, 1)))};
@@ -143,11 +131,21 @@ Move EnhancedBoard::notationToMove(string m) {
                 }
                 break;
         }
+        */
     }
     catch (...) {}
     return {};
 }
 
+string EnhancedBoard::moveToNotation(Move m) {
+    return "";
+}
+
+void EnhancedBoard::exportToPGN(string filepath) {
+    return;
+}
+
+/*
 // missing extra descriptor
 string EnhancedBoard::moveToNotation(Move m) {
     // returns a string containing the current move in PGN format
