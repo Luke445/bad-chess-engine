@@ -62,6 +62,8 @@ public:
 
     bool doesRookAttackKing(char pos, char kingPos);
 
+    bool isWhiteSquare(char pos);
+
     bool doesBishopAttackKing(char pos, char kingPos);
 
     bool doesKnightAttackKing(char pos, char kingPos);

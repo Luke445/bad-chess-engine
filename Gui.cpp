@@ -144,7 +144,6 @@ void Gui::loop() {
             done = true;
             return;
         }
-
         if (e.type == SDL_MOUSEBUTTONUP) {
             int x, y;
             SDL_GetMouseState( &x, &y );

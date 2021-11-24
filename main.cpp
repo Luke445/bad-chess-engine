@@ -2,11 +2,14 @@
 #include <thread>
 #include "Computer.h"
 #include "EnhancedBoard.h"
+#include "Threads.h"
 #include "Gui.h"
 
 using namespace std;
 
 bool done = false;
+
+ComputerBoard *com;
 
 void printStatus(int status) {
     if (status == whiteWins)
@@ -33,7 +36,7 @@ Move getPlayerMove(EnhancedBoard *board) {
 
 Move getPlayerMoveGui(Move *sharedMove) {
     while (sharedMove->from == -1 || sharedMove->to == -1 || sharedMove->flags == -1) {
-        this_thread::sleep_for(chrono::milliseconds(1));
+        this_thread::sleep_for(chrono::milliseconds(10));
         if (done)
             return {-1, -1, -1};
     }
@@ -44,20 +47,19 @@ Move getPlayerMoveGui(Move *sharedMove) {
     return m;
 }
 
-void playWithComputer() {
+void playWithComputer(Move *unsused) {
     Move m;
     int status;
-    ComputerBoard com = ComputerBoard();
     while (true) {
-        com.mainBoard.printBoard();
+        com->mainBoard.printBoard();
 
-        m = getPlayerMove(&com.mainBoard);
+        m = getPlayerMove(&com->mainBoard);
         if (m.to == -1)
             break;
 
-        cout << m.from << ", " << m.to << "\n";
+        cout << (int)m.from << ", " << (int)m.to << "\n";
 
-        status = com.submitPlayerMove(m);
+        status = com->submitPlayerMove(m);
         if (status != gameNotOver) {
             if (status == -1) {
                 cout << "\n";
@@ -67,9 +69,9 @@ void playWithComputer() {
             break;
         }
 
-        com.mainBoard.printBoard();
+        com->mainBoard.printBoard();
 
-        status = com.doComputerMove();
+        status = com->doComputerMove();
         if (status != gameNotOver) {
             if (status == -1) {
                 cout << "Invalid Com Move\n";
@@ -83,7 +85,7 @@ void playWithComputer() {
     }
 }
 
-void playWithComputerGui(ComputerBoard *com, Move *sharedMove) {
+void playWithComputerGui(Move *sharedMove) {
     Move m;
     int status;
     while (true) {
@@ -112,23 +114,42 @@ void playWithComputerGui(ComputerBoard *com, Move *sharedMove) {
     }
 }
 
-void createThreads() {
-    ComputerBoard com = ComputerBoard();
-    EnhancedBoard *b = &com.mainBoard;
+void createThreads() {        
+    function<void(Move *)> func = playWithComputer;
     Move sharedMove = {-1, -1, -1};
-    thread test(playWithComputerGui, &com, &sharedMove);
+    Threads threadPool(func, &sharedMove);
+
+    ComputerBoard c{&threadPool};
+    com = &c;
+
+    done = true;
+
+    threadPool.shutdown();
+}
+
+void createThreadsGui() {        
+    function<void(Move *)> func = playWithComputerGui;
+    Move sharedMove = {-1, -1, -1};
+    Threads threadPool(func, &sharedMove);
+
+    ComputerBoard c{&threadPool};
+    com = &c;
+
+    EnhancedBoard *b = &com->mainBoard;
     Gui g = Gui(b, &sharedMove);
+
     g.runGui();
 
     done = true;
-    test.join();
+
+    threadPool.shutdown();
 }
 
 int main(int argc, char *argv[]) {
     if (argc >= 2 && strcmp(argv[1], "--nogui") == 0)
-        playWithComputer();
-    else
         createThreads();
+    else
+        createThreadsGui();
 
     return 0;
 }

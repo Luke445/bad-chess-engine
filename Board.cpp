@@ -23,7 +23,7 @@ Board::Board(Board *oldBoard) {
 }
 
 void Board::copyFromOtherBoard(Board *oldBoard) {
-    memcpy(b, oldBoard->b, 8 * 8 * sizeof(char));
+    memcpy(b, oldBoard->b, 64 * sizeof(char));
     isWhitesTurn = oldBoard->isWhitesTurn;
     movesPlayed = oldBoard->movesPlayed;
     gameStatus = oldBoard->gameStatus;
@@ -92,7 +92,7 @@ int Board::doMove(Move m, bool evalCheckmate) {
         case blackPawn:
             // en passant
             if ((m.from & 0b111) != (m.to & 0b111) && getPos(m.to) == noPiece)
-                b[m.from + (m.to & 0b111)] = noPiece;
+                b[(m.from & 0b111000) + (m.to & 0b111)] = noPiece;
             // promotion
             int a;
             if (m.to <= 7 || m.to >= 56) {
@@ -221,6 +221,7 @@ bool Board::doesQueenAttackKing(char pos, char kingPos) {
 bool Board::doesRookAttackKing(char pos, char kingPos) {
     bool isWhite = isPosWhite(pos);
     char next;
+
     for (next = pos + 1; (next & 0b111) != 0; next++) {
         if (isSquareAvailable(next, isWhite)) {
             if (kingPos == next) {return true;}
@@ -249,12 +250,21 @@ bool Board::doesRookAttackKing(char pos, char kingPos) {
                 break;
         } else {break;}
     }
+
     return false;
+}
+
+bool Board::isWhiteSquare(char pos) {
+    if (pos & 0b1000)
+        return pos & 0b1;
+    else
+        return !(pos & 0b1);
 }
 
 bool Board::doesBishopAttackKing(char pos, char kingPos) {
     bool isWhite = isPosWhite(pos);
     char next;
+
     for (next = pos + 9; (next & 0b111) != 0; next += 9) {
         if (isSquareAvailable(next, isWhite)) {
             if (kingPos == next) {return true;}
@@ -283,6 +293,7 @@ bool Board::doesBishopAttackKing(char pos, char kingPos) {
                 break;
         } else {break;}
     }
+
     return false;
 }
 

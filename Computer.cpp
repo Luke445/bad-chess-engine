@@ -1,19 +1,23 @@
 #include <iostream>
 #include <random>
 #include "Board.h"
+#include "Threads.h"
 #include "Computer.h"
 
 using namespace std;
 using namespace std::chrono;
 
-ComputerBoard::ComputerBoard() {
+// change depth here
+const int DEPTH = 6;
+
+ComputerBoard::ComputerBoard(Threads *t) {
     mainBoard.resetBoard();
+    threadPool = t;
 }
 
 int ComputerBoard::doComputerMove() {
     auto start = high_resolution_clock::now();
-    // change depth here
-    Move m = bruteForce(4);
+    Move m = bruteForce(DEPTH);
     auto stop = high_resolution_clock::now();
 
     auto duration = duration_cast<milliseconds>(stop - start);
@@ -52,28 +56,58 @@ Move ComputerBoard::bruteForce(int depth) {
     vector<Move> *moves = mainBoard.getAllValidMoves();
     // randomize moves with the same score
     shuffle(moves->begin(), moves->end(), random_device());
-    Board b;
-    Move bestMove = moves->at(0);
-    int bestScore = 1000;
-    int value, status;
-    for (Move m : *moves) {
-        b.copyFromOtherBoard(&mainBoard);
-        status = b.doMove(m);
-        if (status != gameNotOver)
-            value = setValueFromStatus(status);
-        else
-            value = evalPos(&b, depth - 1, -1000, 1000);
 
-        if (value < bestScore) {
-            bestScore = value;
-            bestMove = m;
-        }
+    // prepare jobs
+    for (int i = 0; i < moves->size(); i++)
+        evalQueue.push(moves->at(i));
+    function<void()> func = bind(&ComputerBoard::evalMove, this);
+    for (int i = 0; i < moves->size(); i++)
+        threadPool->addJob(func);
+
+    // wait for done
+    threadPool->waitUntilDone();
+
+    // select best move
+    pair<Move, int> best = moveEvals[0];
+    for (pair<Move, int> curPair : moveEvals) {
+        if (curPair.second < best.second)
+            best = curPair;
     }
-    return bestMove;
+
+    // cleanup
+    moveEvals.clear();
+
+    return best.first;
 }
 
 int ComputerBoard::scoreBoard(Board *b) {
     return b->getMaterialDiff();
+}
+
+// shorthand callback for threads
+void ComputerBoard::evalMove() {
+    // get move SAFELY
+    unique_lock<mutex> lock(queueLock);
+
+    condition.wait(lock, [this]() {return !evalQueue.empty();});
+    if (evalQueue.empty())
+        return;
+    Move m = evalQueue.front();
+    evalQueue.pop();
+
+    queueLock.unlock();
+
+    // eval move
+    int value, status;
+    Board b(mainBoard);
+    status = b.doMove(m);
+    if (status != gameNotOver)
+        value = setValueFromStatus(status);
+    else
+        value = evalPos(&b, DEPTH - 1, -1000, 1000);
+
+    // submit value
+    moveEvals.push_back(pair<Move, int> {m, value});
 }
 
 /*
@@ -90,7 +124,6 @@ int ComputerBoard::evalPos(Board *startingBoard, int depth, int alpha, int beta)
         return 0;
 
     Board b;
-    Move bestMove = moves->at(0);
     int status, value;
     if (startingBoard->getIsWhitesTurn()) {
         value = -1000;
