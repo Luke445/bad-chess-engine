@@ -1,9 +1,21 @@
 #include "EnhancedBoard.h"
 #include <iostream>
+#include <fstream>
 
 using namespace std;
 
-string EnhancedBoard::getPieceStr(int piece) {
+int EnhancedBoard::doMove(Move m) {
+    if (isValidMove(m)) {
+        gameStatus = Board::doMove(m);
+        moveList.push_back(m);
+        movesPlayed++;
+        return gameStatus;
+    }
+
+    return -1;
+}
+
+string EnhancedBoard::getPieceStr(char piece) {
     // abs switches black pieces to white
     switch (abs(piece)) {
         case whiteKing:
@@ -24,7 +36,7 @@ string EnhancedBoard::getPieceStr(int piece) {
 }
 
 Move EnhancedBoard::notationToMove(string m) {
-    try {
+    /*try {
         // remove trailing + or #
         if (!(m.compare(m.size() - 1, 1, "+") && m.compare(m.size() - 1, 1, "#")))
             m = m.substr(0, m.size() - 1);
@@ -42,7 +54,6 @@ Move EnhancedBoard::notationToMove(string m) {
                 return {32, 16};
         }
 
-        /*
         // check for promotion
         if (m.compare(m.size() - 2, 1, "=") == 0) {
             Pos to = {((char) m.at(m.size() - 4)) - 97, (8 - stoi(m.substr(m.size() - 3, 1)))};
@@ -131,55 +142,64 @@ Move EnhancedBoard::notationToMove(string m) {
                 }
                 break;
         }
-        */
     }
-    catch (...) {}
+    catch (...) {}*/
     return {};
 }
 
-string EnhancedBoard::moveToNotation(Move m) {
-    return "";
+string EnhancedBoard::moveToNotationNoUpdate(Move m) {
+    // gives the move notation without updating the board data
+    EnhancedBoard b = *this;
+    return b.moveToNotation(m);
 }
 
-void EnhancedBoard::exportToPGN(string filepath) {
-    return;
-}
-
-/*
-// missing extra descriptor
 string EnhancedBoard::moveToNotation(Move m) {
     // returns a string containing the current move in PGN format
+    // the passed in move will be played
     string from, to, out;
     // change number to letter by using ascii table offset (+97) 0 -> a, 1 -> b, etc.
-    from = ((char) m.from.x + 97);
-    from += to_string(8 - m.from.y);
-    to = ((char) m.to.x + 97);
-    to += to_string(8 - m.to.y);
+    from = ((char) (m.from & 7) + 97);
+    from += to_string(8 - (m.from >> 3));
+    to = ((char) (m.to & 7) + 97);
+    to += to_string(8 - (m.to >> 3));
     bool isCapture = getPos(m.to) != noPiece;
-    int piece = getPos(m.from);
+
+    char piece = getPos(m.from);
+
+    int moveStatus = Board::doMove(m);
 
     // castling
     if (piece == whiteKing) {
-        if (whiteKingSideCastle && m.to.x == 6)
+        if (m.from == 60 && m.to == 62) {
             out = "O-O";
-        else if (whiteQueenSideCastle && m.to.x == 2)
+            goto end;
+        }
+        else if (m.from == 60 && m.to == 58) {
             out = "O-O-O";
-        goto end;
+            goto end;
+        }
     }
     else if (piece == blackKing) {
-        if (blackKingSideCastle && m.to.x == 6)
+        if (m.from == 4 && m.to == 6) {
             out = "O-O";
-        else if (blackQueenSideCastle && m.to.x == 2)
+            goto end;
+        }
+        else if (m.from == 4 && m.to == 2) {
             out = "O-O-O";
-        goto end;
+            goto end;
+        }
     }
 
     if (abs(piece) == whitePawn) {
+        // check for en passant  
+        if ((m.from & 0b111) != (m.to & 0b111) && !isCapture)
+            isCapture = true;
+
         if (isCapture)
             out = from.substr(0, 1) + "x" + to;
         else
             out = to;
-        if (m.to.y == 0 || m.to.y == 7) { // promoting
+        if ((m.to >> 3) == 0 || (m.to >> 3) == 7) { // promoting
             if (m.flags == whiteBishop || m.flags == whiteKnight || m.flags == whiteRook)
                 out += "=" + getPieceStr(m.flags);
             else
@@ -187,18 +207,63 @@ string EnhancedBoard::moveToNotation(Move m) {
         }
     }
     else {
-        out = getPieceStr(getPos(m.from));
-        // TODO: add extra descriptor if multiple pieces can move to same spot
+        bool multiplePieces = false;
+        bool sameFile = false;
+        bool sameRank = false;
+        vector<Move> moves;
+        int pos;
+
+        b[m.from] = whiteKing;
+        b[m.to] = -b[m.to];
+        switch (abs(piece)) {
+            case whiteKnight:
+                getKnightMoves(&moves, m.to);
+                break;
+            case whiteQueen:
+                getQueenMoves(&moves, m.to);
+                break;
+            case whiteRook:
+                getRookMoves(&moves, m.to);
+                break;
+            case whiteBishop:
+                getBishopMoves(&moves, m.to);
+                break;
+        }
+        b[m.to] = -b[m.to];
+        b[m.from] = noPiece;
+
+        // & 7 == file          >> 3 == rank
+        for (int i = 0; i < moves.size(); i++) {
+            pos = moves.at(i).to;
+            if (getPos(pos) == piece) {
+                multiplePieces = true;
+                if ((m.from >> 3) == (pos >> 3))
+                    sameRank = true;
+                else if ((m.from & 7) == (pos & 7))
+                    sameFile = true;
+            }
+        }
+
+        out = getPieceStr(piece);
+
+        if (sameRank && sameFile) {
+            out += from;
+        }
+        else if (sameFile) {
+            out += from.substr(1, 1);
+        }
+        else if (multiplePieces) {
+            out += from.substr(0, 1);
+        }
+        
         if (isCapture)
             out += "x";
         out += to;
     }
 
 end:
-    Board newBoard = Board(this);
-    int status = newBoard.doMove(m);
-    if (newBoard.isCheck()) {
-        if (status == whiteWins || status == blackWins) // checkmate
+    if (isCheck()) {
+        if (moveStatus == whiteWins || moveStatus == blackWins) // checkmate
             out += "#";
         else // check
             out += "+";
@@ -207,38 +272,48 @@ end:
     return out;
 }
 
-// needs the new implementation of the moves list
 void EnhancedBoard::exportToPGN(string filepath) {
-    // TODO: export current game to a valid .pgn file
     ofstream f;
     f.open(filepath);
-    if (f.is_open()) {
-        f << "[Event \"Testing\"]\n";
-        f << "[Site \"Somewhere in the US\"]\n";
-        f << "[Date \"??\"]\n";
-        f << "[Round \"0\"]\n";
-        f << "[White \"Tester, 1\"]\n";
-        f << "[Black \"Tester, 2\"]\n";
-        f << "[Result \"*\"]\n\n";
-
-        int curMove = 0;
-        for (int i = 0; i + 1 < moveList.size(); i+=2) {
-            f << to_string(curMove) << ". " << moveToNotation(moveList.at(i)) << " " << moveToNotation(moveList.at(i + 1)) << " \n";
-            curMove += 1;
-        }
-    }
-    else
+    if (!f.is_open()) {
         cout << "failed to open output file\n";
+        return;
+    }
+
+    // header information
+    f << "[Event \"?\"]\n";
+    f << "[Site \"?\"]\n";
+    f << "[Date \"????.??.??\"]\n";
+    f << "[Round \"?\"]\n";
+    f << "[White \"?\"]\n";
+    f << "[Black \"?\"]\n";
+    f << "[Result \"*\"]\n\n";
+
+    // moves
+    bool isWhiteMove = true;
+    int curMove = 1;
+
+    // reset the board data and then play through all the moves again
+    // to restore the original board and create the pgn notation
+    resetBoard();
+    for (int i = 0; i < moveList.size(); i++) {
+        if (isWhiteMove) {
+            f << to_string(curMove++) << ". " << moveToNotation(moveList.at(i)) << " ";
+        }
+        else { // black's move
+            f << moveToNotation(moveList.at(i)) << " ";
+        }
+        isWhiteMove = !isWhiteMove;
+    }
+
     f.close();
 }
-*/
 
 void EnhancedBoard::printBoard() {
     string pieceStr;
-    char pos = 0;
     cout << "    a b c d e f g h\n";
     cout << "  *----------------";
-    for (pos = 0; pos < 64; pos += 8) {
+    for (int pos = 0; pos < 64; pos += 8) {
         cout << "\n" << (8 - ((int) (pos / 8))) << " | ";
         for (int i = 0; i < 8; i++) {
             pieceStr = getPieceStr(getPos(pos + i));
@@ -248,4 +323,15 @@ void EnhancedBoard::printBoard() {
         }
     }
     cout << "\n";
+}
+
+Move EnhancedBoard::getLastMove() {
+    if (movesPlayed == 0)
+        return {-1, -1, -1};
+    else
+        return lastMove;
+}
+
+int EnhancedBoard::getStatus() {
+    return gameStatus;
 }

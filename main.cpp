@@ -1,4 +1,5 @@
 #include <iostream>
+#include <stdlib.h>
 #include <thread>
 #include "Computer.h"
 #include "EnhancedBoard.h"
@@ -8,6 +9,7 @@
 using namespace std;
 
 bool done = false;
+bool exportGame = false;
 
 ComputerBoard *com;
 
@@ -114,12 +116,12 @@ void playWithComputerGui(Move *sharedMove) {
     }
 }
 
-void createThreads() {        
+void createThreads(int depth) {        
     function<void(Move *)> func = playWithComputer;
     Move sharedMove = {-1, -1, -1};
     Threads threadPool(func, &sharedMove);
 
-    ComputerBoard c{&threadPool};
+    ComputerBoard c{&threadPool, depth};
     com = &c;
 
     done = true;
@@ -127,18 +129,32 @@ void createThreads() {
     threadPool.shutdown();
 }
 
-void createThreadsGui() {        
+void createThreadsGui(int depth) {        
     function<void(Move *)> func = playWithComputerGui;
     Move sharedMove = {-1, -1, -1};
     Threads threadPool(func, &sharedMove);
 
-    ComputerBoard c{&threadPool};
+    ComputerBoard c{&threadPool, depth};
     com = &c;
 
     EnhancedBoard *b = &com->mainBoard;
+
+    /*auto start = chrono::high_resolution_clock::now();
+    for (int i = 0; i < 100000000; i++) {
+        volatile bool x = b->isBlackInCheck();
+    }
+    auto stop = chrono::high_resolution_clock::now();
+
+    auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+
+    cout << "isBlackInCheck time: " << duration.count() << "ms" << endl;*/
+
     Gui g = Gui(b, &sharedMove);
 
     g.runGui();
+
+    if (exportGame)
+        b->exportToPGN("out.pgn");
 
     done = true;
 
@@ -146,10 +162,34 @@ void createThreadsGui() {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc >= 2 && strcmp(argv[1], "--nogui") == 0)
-        createThreads();
-    else
-        createThreadsGui();
+    bool noGui = false;
+    int depth = 4;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--nogui") == 0) {
+            noGui = true;
+        }
+        else if (strcmp(argv[i], "-d") == 0) {
+            i++;
+            if (i < argc) {
+                depth = atoi(argv[i]);
+            }
+        }
+        else if (strcmp(argv[i], "-e") == 0) {
+            exportGame = true;
+        }
+    }
+
+    if (depth < 1 || depth > 10) {
+        depth = 4;
+        cout << "invalid depth" << endl;
+    }
+
+    if (noGui) {
+        createThreads(depth);
+    }
+    else {
+        createThreadsGui(depth);
+    }
 
     return 0;
 }

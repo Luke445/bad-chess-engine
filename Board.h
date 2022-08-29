@@ -26,51 +26,47 @@ enum gameStatusFlags {
 };
 
 struct Move {
-    char from;
-    char to;
-    char flags; // used for promotion
+    int from;
+    int to;
+    int flags; // used for promotion
 };
 
 class Board {
 protected:
     char b[64];
     bool isWhitesTurn;
-    int movesPlayed;
-    bool whiteKingSideCastle, whiteQueenSideCastle, blackKingSideCastle, blackQueenSideCastle;
     Move lastMove;
-    int gameStatus;
+    bool whiteKingSideCastle, whiteQueenSideCastle, blackKingSideCastle, blackQueenSideCastle;
+    int blackKingPos;
+    int whiteKingPos;
     std::vector<Move> validMoves;
 
 public:
     Board();
 
-    Board(Board *oldBoard);
-
-    void copyFromOtherBoard(Board *oldBoard);
+    void quickCopy(Board *otherBoard);
 
     void resetBoard();
 
-    int doMove(Move m, bool evalCheckmate=true);
+    int doMove(Move m);
 
-    int getPos(char pos);
+    void quickDoMove(Move m);
+
+    char getPos(int pos);
 
     bool isCheck();
 
-    bool doesKingAttackKing(char pos, char otherKingPos);
+    bool isWhiteInCheck();
 
-    bool doesQueenAttackKing(char pos, char kingPos);
+    bool isBlackInCheck();
 
-    bool doesRookAttackKing(char pos, char kingPos);
+    //bool isWhiteInCheckNew();
 
-    bool isWhiteSquare(char pos);
+    //bool isBlackInCheckNew();
 
-    bool doesBishopAttackKing(char pos, char kingPos);
+    bool isWhiteSquare(int pos);
 
-    bool doesKnightAttackKing(char pos, char kingPos);
-
-    bool doesPawnAttackKing(char pos, char kingPos);
-
-    bool isPosWhite(char pos);
+    bool isPosWhite(int pos);
 
     bool isValidMove(Move m);
 
@@ -78,31 +74,27 @@ public:
 
     std::vector<Move> * getAllValidMoves();
 
-    void getMovesForPiece(std::vector<Move> *moves, char pos);
+    void getMovesForPiece(std::vector<Move> *moves, int pos);
 
-    bool posOnBoard(char pos);
+    bool posOnBoard(int pos);
 
-    bool isSquareAvailable(char pos, bool isWhite);
+    bool isSquareAvailable(int pos, bool isWhite);
 
-    void getKingMoves(std::vector<Move> *moves, char pos);
+    void getKingMoves(std::vector<Move> *moves, int pos);
 
-    void getQueenMoves(std::vector<Move> *moves, char pos);
+    void getQueenMoves(std::vector<Move> *moves, int pos);
 
-    void getRookMoves(std::vector<Move> *moves, char pos);
+    void getRookMoves(std::vector<Move> *moves, int pos);
 
-    void getBishopMoves(std::vector<Move> *moves, char pos);
+    void getBishopMoves(std::vector<Move> *moves, int pos);
 
-    void getKnightMoves(std::vector<Move> *moves, char pos);
+    void getKnightMoves(std::vector<Move> *moves, int pos);
 
-    void getPawnMoves(std::vector<Move> *moves, char pos);
+    void getPawnMoves(std::vector<Move> *moves, int pos);
 
-    int getPieceValue(int piece);
+    int getPieceValue(char piece);
 
     int getMaterialDiff();
 
-    Move getLastMove();
-
     bool getIsWhitesTurn();
-
-    int getStatus();
 };

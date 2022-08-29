@@ -6,15 +6,19 @@
 class ComputerBoard {
 private:
     std::queue<Move> evalQueue;
-    std::mutex queueLock;
-    std::condition_variable condition;
+    std::mutex queueMutex;
+    
     std::vector<std::pair<Move, int>> moveEvals;
+    std::mutex evalMutex;
+    
     Threads *threadPool;
+    int startDepth;
+    bool isWhitePieces;
 
 public:
     EnhancedBoard mainBoard;
 
-    ComputerBoard(Threads *t);
+    ComputerBoard(Threads *t, int d);
 
     int doComputerMove();
 
@@ -24,7 +28,11 @@ public:
 
     int setValueFromStatus(int status);
 
-    Move bruteForce(int depth);
+    void sortEvals();
+
+    Move bruteForce();
+
+    int secondaryEval(Move m);
 
     int scoreBoard(Board *b);
 

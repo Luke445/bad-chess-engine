@@ -8,12 +8,12 @@ private:
     SDL_Texture *images[12];
     SDL_Window *window;
     SDL_Renderer *renderer;
-    Board *b;
+    EnhancedBoard *b;
     Move *sharedMove;
     Move lastMove;
     bool done = false;
-    char selectedPos = -1;
-    char selectedPos2 = -1;
+    int selectedPos = -1;
+    int selectedPos2 = -1;
     char checkmatePos = -1;
     bool isPieceSelected = false;
     bool promoting = false;

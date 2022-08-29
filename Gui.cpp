@@ -1,7 +1,6 @@
 #include <iostream>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
-#include "Board.h"
 #include "Gui.h"
 
 using namespace std;
@@ -59,12 +58,12 @@ void Gui::drawChessBoard() {
     rect.h = BOX_HEIGHT;
 
     bool isWhite = true;
-    int piece;
+    char piece;
     for (int x = 0; x < 8; x++) {
         for (int y = 0; y < 8; y++) {
             rect.x = x * rect.w;
             rect.y = y * rect.h;
-            char pos = y * 8 + x;
+            int pos = y * 8 + x;
 
             if ((isPieceSelected && selectedPos == pos) ||
                 (lastMove.from == pos) || (lastMove.to == pos))
@@ -147,10 +146,10 @@ void Gui::loop() {
         if (e.type == SDL_MOUSEBUTTONUP) {
             int x, y;
             SDL_GetMouseState( &x, &y );
-            char mousePos = (y / BOX_HEIGHT * 8) + (x / BOX_WIDTH);
+            int mousePos = (y / BOX_HEIGHT * 8) + (x / BOX_WIDTH);
             if (promoting) {
                 if ((mousePos & 0b111) == (selectedPos2 & 0b111)) {
-                    char promoteTo = -1;
+                    int promoteTo = -1;
                     int mouseY = y / BOX_HEIGHT;
                     if (mouseY == 0)
                         promoteTo = whiteQueen;
@@ -199,13 +198,13 @@ void Gui::loop() {
 
     int status = b->getStatus();
     if (status == whiteWins) {
-        for (char pos = 0; pos < 64; pos++) {
+        for (int pos = 0; pos < 64; pos++) {
             if (b->getPos(pos) == blackKing)
                 checkmatePos = pos;
         }
     }
     else if (status == blackWins) {
-        for (char pos = 0; pos < 64; pos++) {
+        for (int pos = 0; pos < 64; pos++) {
             if (b->getPos(pos) == whiteKing)
                 checkmatePos = pos;
         }
