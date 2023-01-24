@@ -7,15 +7,20 @@ private:
     std::vector<Move> moveList;
     int gameStatus;
     int movesPlayed;
+    std::vector<Move> validMoves;
+
+    std::string moveToNotationInternal(Move m);
 
 public:
     int doMove(Move m);
 
+    bool isValidMove(Move m);
+
+    std::vector<Move> * getAllValidMoves();
+
     std::string getPieceStr(char piece);
 
     Move notationToMove(std::string m);
-
-    std::string moveToNotationNoUpdate(Move m);
 
     std::string moveToNotation(Move m);
 
@@ -23,7 +28,11 @@ public:
 
     void printBoard();
 
-    int getStatus();
+    char getPos(int pos);
+
+    bool isPosWhite(int pos);
 
     Move getLastMove();
+
+    int getStatus();
 };

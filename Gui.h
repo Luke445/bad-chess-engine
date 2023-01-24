@@ -17,14 +17,16 @@ private:
     char checkmatePos = -1;
     bool isPieceSelected = false;
     bool promoting = false;
-
+    bool isWhitePieces;
 
 public:
-    Gui(EnhancedBoard *board, Move *m);
+    Gui(EnhancedBoard *board, Move *m, bool isWhite);
 
     void drawCircle(int centerX, int centerY, int radius);
 
     void drawChessBoard();
+
+    void drawChessBoardFlipped();
 
     void loop();
 

@@ -38,19 +38,19 @@ void Threads::threadWaitLoop() {
     }
 }
 
+void Threads::waitUntilDone() {
+    acceptFunctions = false;
+    while (!queue.empty() || waitingThreads != threads.size()) {
+        this_thread::sleep_for(chrono::milliseconds(10));
+    }
+}
+
 void Threads::addJob(function<void()> func) {
     unique_lock<mutex> lock(queueLock);
     queue.push(func);
 
     lock.unlock();
     condition.notify_one();
-}
-
-void Threads::waitUntilDone() {
-    acceptFunctions = false;
-    while (!queue.empty() || waitingThreads != threads.size()) {
-        this_thread::sleep_for(chrono::milliseconds(10));
-    }
 }
 
 void Threads::shutdown() {

@@ -5,7 +5,7 @@ BadChess : main.o Board.o Computer.o EnhancedBoard.o Gui.o Threads.o
 	$(CC) $(CFLAGS) -o ./BadChess *.o -lSDL2 -lSDL2_image
 	rm *.o
 
-Board.o : Board.cpp Board.h
+Board.o : Board.cpp Board.h Data.h
 	$(CC) $(CFLAGS) -c Board.cpp
 
 Computer.o : Computer.cpp Computer.h

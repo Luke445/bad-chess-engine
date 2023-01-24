@@ -18,7 +18,7 @@ private:
 public:
     EnhancedBoard mainBoard;
 
-    ComputerBoard(Threads *t, int d);
+    ComputerBoard(Threads *t, int d, bool isWhite);
 
     int doComputerMove();
 
@@ -26,15 +26,17 @@ public:
 
     Move selectRandomMove(std::vector<Move> *moves);
 
-    int setValueFromStatus(int status);
-
     void sortEvals();
 
     Move bruteForce();
 
-    int secondaryEval(Move m);
+    int secondaryEvalWhite(Move m);
+
+    int secondaryEvalBlack(Move m);
 
     int scoreBoard(Board *b);
+
+    int getPieceValue(char piece);
 
     void evalMove();
 

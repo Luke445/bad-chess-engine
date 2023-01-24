@@ -27,10 +27,11 @@ const char *FILENAMES[] = {
 };
 
 
-Gui::Gui(EnhancedBoard *board, Move *m) {
+Gui::Gui(EnhancedBoard *board, Move *m, bool isWhite) {
     b = board;
     sharedMove = m;
     lastMove = b->getLastMove();
+    isWhitePieces = isWhite;
 }
 
 void Gui::drawCircle(int centerX, int centerY, int radius){
@@ -104,8 +105,8 @@ void Gui::drawChessBoard() {
         SDL_Rect rect;
         rect.w = BOX_WIDTH - 10;
         rect.h = BOX_WIDTH * 4 - 10;
-        rect.x = (selectedPos2 & 0b111) * BOX_WIDTH + 5;
-        rect.y = (selectedPos2 >> 3) * BOX_HEIGHT  + 5;
+        rect.x = FILE(selectedPos2) * BOX_WIDTH + 5;
+        rect.y = RANK(selectedPos2) * BOX_HEIGHT + 5;
         SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
         SDL_RenderFillRect(renderer, &rect);
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
@@ -127,7 +128,106 @@ void Gui::drawChessBoard() {
         vector<Move> *moves = b->getAllValidMoves();
         for (Move m : *moves) {
             if (m.from == selectedPos) {
-                drawCircle((m.to & 0b111) * BOX_WIDTH + BOX_WIDTH_CENTER, ((m.to >> 3) * BOX_HEIGHT + BOX_HEIGHT_CENTER), CIRCLE_RADIUS);
+                // manually draw pawns that could promote bc promotion piece is store in destination rank
+                if (b->getPos(selectedPos) == whitePawn && RANK(selectedPos) == 1) {
+                    if (RANK(m.to) == whiteQueen)
+                        drawCircle(FILE(m.to) * BOX_WIDTH + BOX_WIDTH_CENTER, BOX_HEIGHT_CENTER, CIRCLE_RADIUS);
+                }
+                else
+                    drawCircle(FILE(m.to) * BOX_WIDTH + BOX_WIDTH_CENTER, RANK(m.to) * BOX_HEIGHT + BOX_HEIGHT_CENTER, CIRCLE_RADIUS);
+            }
+        }
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+    }
+
+    SDL_RenderPresent(renderer);
+}
+
+void Gui::drawChessBoardFlipped() {
+    SDL_RenderClear(renderer);
+
+    SDL_Rect rect;
+
+    rect.w = BOX_WIDTH;
+    rect.h = BOX_HEIGHT;
+
+    bool isWhite = true;
+    char piece;
+    for (int x = 0; x < 8; x++) {
+        for (int y = 0; y < 8; y++) {
+            rect.x = x * rect.w;
+            rect.y = y * rect.h;
+            int pos = y * 8 + x;
+
+            if ((isPieceSelected && selectedPos == 63 - pos) ||
+                (lastMove.from == 63 - pos) || (lastMove.to == 63 - pos))
+            {
+                if (isWhite)
+                    SDL_SetRenderDrawColor(renderer, 240, 232, 129, 255);
+                else
+                    SDL_SetRenderDrawColor(renderer, 138, 130, 33, 255);
+            }
+            else if (isWhite)
+                SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+            else
+                SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+
+            if (checkmatePos == pos)
+                SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+
+            SDL_RenderFillRect(renderer, &rect);
+
+            // blit images here
+            piece = b->getPos(63 - pos);
+            if (piece != noPiece) {
+                if (piece < 0) {
+                    SDL_RenderCopy(renderer, images[abs(piece) + 5], NULL, &rect);
+                }
+                else {
+                    SDL_RenderCopy(renderer, images[piece - 1], NULL, &rect);
+                }
+            }
+
+            isWhite = !isWhite;
+        }
+        isWhite = !isWhite;
+    }
+
+    if (promoting) {
+        // draw box
+        SDL_Rect rect;
+        rect.w = BOX_WIDTH - 10;
+        rect.h = BOX_WIDTH * 4 - 10;
+        rect.x = FILE(63 - selectedPos2) * BOX_WIDTH + 5;
+        rect.y = RANK(63 - selectedPos2) * BOX_HEIGHT + 5;
+        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+        SDL_RenderFillRect(renderer, &rect);
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderDrawRect(renderer, &rect);
+
+        // add pieces
+        rect.h = BOX_HEIGHT - 10;
+        SDL_RenderCopy(renderer, images[7], NULL, &rect);
+        rect.y += BOX_HEIGHT;
+        SDL_RenderCopy(renderer, images[8], NULL, &rect);
+        rect.y += BOX_HEIGHT;
+        SDL_RenderCopy(renderer, images[9], NULL, &rect);
+        rect.y += BOX_HEIGHT;
+        SDL_RenderCopy(renderer, images[10], NULL, &rect);
+    }
+    else if (isPieceSelected) {
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        SDL_SetRenderDrawColor(renderer, 130, 130, 130, 150);
+        vector<Move> *moves = b->getAllValidMoves();
+        for (Move m : *moves) {
+            if (m.from == selectedPos) {
+                // manually draw pawns that could promote bc promotion piece is store in destination rank
+                if (b->getPos(selectedPos) == blackPawn && RANK(selectedPos) == 6) {
+                    if (RANK(m.to) == whiteQueen)
+                        drawCircle(FILE(63 - m.to) * BOX_WIDTH + BOX_WIDTH_CENTER, BOX_HEIGHT_CENTER, CIRCLE_RADIUS);
+                }
+                else
+                    drawCircle(FILE(63 - m.to) * BOX_WIDTH + BOX_WIDTH_CENTER, RANK(63 - m.to) * BOX_HEIGHT + BOX_HEIGHT_CENTER, CIRCLE_RADIUS);
             }
         }
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
@@ -147,21 +247,23 @@ void Gui::loop() {
             int x, y;
             SDL_GetMouseState( &x, &y );
             int mousePos = (y / BOX_HEIGHT * 8) + (x / BOX_WIDTH);
+            if (!isWhitePieces)
+                mousePos = 63 - mousePos;
             if (promoting) {
-                if ((mousePos & 0b111) == (selectedPos2 & 0b111)) {
+                if (FILE(mousePos) == FILE(selectedPos2)) {
                     int promoteTo = -1;
                     int mouseY = y / BOX_HEIGHT;
                     if (mouseY == 0)
                         promoteTo = whiteQueen;
-                    else if (mouseY  == 1)
+                    else if (mouseY == 1)
                         promoteTo = whiteRook;
-                    else if (mouseY  == 2)
+                    else if (mouseY == 2)
                         promoteTo = whiteBishop;
-                    else if (mouseY  == 3)
+                    else if (mouseY == 3)
                         promoteTo = whiteKnight;
 
                     if (promoteTo != -1) {
-                        Move m = {selectedPos, selectedPos2, promoteTo};
+                        Move m = {selectedPos, (selectedPos2 & 0b111) | (promoteTo << 3)};
 
                         if (b->isValidMove(m)) {
                             if (sharedMove->from == -1)
@@ -176,19 +278,23 @@ void Gui::loop() {
                 isPieceSelected = true;
             }
             else {
-                if (b->getPos(selectedPos) == whitePawn) {
-                    if (mousePos <= 7) {
+                Move m;
+                if ((b->getPos(selectedPos) == whitePawn && RANK(selectedPos) == 1) ||
+                    (b->getPos(selectedPos) == blackPawn && RANK(selectedPos) == 6)) 
+                {
+                    m = {selectedPos, (FILE(mousePos) | (whiteQueen << 3))};
+                    if (b->isValidMove(m)) {
                         selectedPos2 = mousePos;
                         promoting = true;
-                        return;
                     }
                 }
+                else {
+                    m = {selectedPos, mousePos};
 
-                Move m = {selectedPos, mousePos, 0};
-
-                if (b->isValidMove(m)) {
-                    if (sharedMove->from == -1)
-                        *sharedMove = m;
+                    if (b->isValidMove(m)) {
+                        if (sharedMove->from == -1)
+                            *sharedMove = m;
+                    }
                 }
 
                 isPieceSelected = false;
@@ -212,7 +318,10 @@ void Gui::loop() {
 
     lastMove = b->getLastMove();
 
-    drawChessBoard();
+    if (isWhitePieces)
+        drawChessBoard();
+    else
+        drawChessBoardFlipped();
 }
 
 int Gui::runGui() {

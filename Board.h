@@ -1,6 +1,12 @@
 #pragma once
 
 #include <vector>
+#include <inttypes.h>
+
+// get the rank or file from a position (0-63) by bit operations
+#define RANK(pos) ((pos) >> 3) // rank is horizontal
+#define FILE(pos) ((pos) & 7)  // file is vertical
+#define POS_TO_BITMASK(pos) ((uint64_t)1 << (pos))
 
 enum pieces {
     noPiece = 0,
@@ -22,79 +28,73 @@ enum gameStatusFlags {
     gameNotOver,
     whiteWins,
     blackWins,
-    draw
+    draw,
+    invalidMove
 };
 
 struct Move {
     int from;
     int to;
-    int flags; // used for promotion
 };
 
 class Board {
 protected:
-    char b[64];
     bool isWhitesTurn;
     Move lastMove;
     bool whiteKingSideCastle, whiteQueenSideCastle, blackKingSideCastle, blackQueenSideCastle;
     int blackKingPos;
     int whiteKingPos;
-    std::vector<Move> validMoves;
+
+    uint64_t whitePawnBB;
+    uint64_t whiteKnightBB;
+    uint64_t whiteBishopBB;
+    uint64_t whiteRookBB;
+
+    uint64_t blackPawnBB;
+    uint64_t blackKnightBB;
+    uint64_t blackBishopBB;
+    uint64_t blackRookBB;
 
 public:
     Board();
 
-    void quickCopy(Board *otherBoard);
-
     void resetBoard();
+
+    void whiteCapturePos(uint64_t mask);
+
+    void blackCapturePos(uint64_t mask);
 
     int doMove(Move m);
 
-    void quickDoMove(Move m);
-
-    char getPos(int pos);
-
     bool isCheck();
 
-    bool isWhiteInCheck();
+    bool isWhiteInCheck(uint64_t allPiecesBB);
 
-    bool isBlackInCheck();
+    bool isBlackInCheck(uint64_t allPiecesBB);
 
-    //bool isWhiteInCheckNew();
+    void startMoveGenerator(std::function<void(Move)> func, int *stop);
 
-    //bool isBlackInCheckNew();
+    void getMovesForWhitePiece(std::function<void(Move)> func, int pos, uint64_t whiteBB, uint64_t blackBB, uint64_t allBB);
+    
+    void getMovesForBlackPiece(std::function<void(Move)> func, int pos, uint64_t whiteBB, uint64_t blackBB, uint64_t allBB);
 
-    bool isWhiteSquare(int pos);
+    void getWhiteKingMoves(std::function<void(Move)> func, int pos, uint64_t allPiecesBB, uint64_t sameColorBB);
 
-    bool isPosWhite(int pos);
+    void getBlackKingMoves(std::function<void(Move)> func, int pos, uint64_t allPiecesBB, uint64_t sameColorBB);
 
-    bool isValidMove(Move m);
+    void getRookMoves(std::function<void(Move)> func, int pos, uint64_t allPiecesBB, uint64_t sameColorBB);
 
-    void getAllSimpleMoves(std::vector<Move> *moves);
+    void getBishopMoves(std::function<void(Move)> func, int pos, uint64_t allPiecesBB, uint64_t sameColorBB);
 
-    std::vector<Move> * getAllValidMoves();
+    void getKnightMoves(std::function<void(Move)> func, int pos, uint64_t sameColorBB);
 
-    void getMovesForPiece(std::vector<Move> *moves, int pos);
+    void getWhitePawnMoves(std::function<void(Move)> func, int pos, uint64_t allPiecesBB, uint64_t oppositeColorBB);
 
-    bool posOnBoard(int pos);
-
-    bool isSquareAvailable(int pos, bool isWhite);
-
-    void getKingMoves(std::vector<Move> *moves, int pos);
-
-    void getQueenMoves(std::vector<Move> *moves, int pos);
-
-    void getRookMoves(std::vector<Move> *moves, int pos);
-
-    void getBishopMoves(std::vector<Move> *moves, int pos);
-
-    void getKnightMoves(std::vector<Move> *moves, int pos);
-
-    void getPawnMoves(std::vector<Move> *moves, int pos);
-
-    int getPieceValue(char piece);
+    void getBlackPawnMoves(std::function<void(Move)> func, int pos, uint64_t allPiecesBB, uint64_t oppositeColorBB);
 
     int getMaterialDiff();
 
     bool getIsWhitesTurn();
+
+    uint64_t getAllPiecesBB();
 };

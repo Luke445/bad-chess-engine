@@ -7,13 +7,12 @@
 using namespace std;
 using namespace std::chrono;
 
-ComputerBoard::ComputerBoard(Threads *t, int d) {
+ComputerBoard::ComputerBoard(Threads *t, int d, bool isWhite) {
     mainBoard.resetBoard();
     threadPool = t;
     startDepth = d;
 
-    // TODO allow the computer to play as white
-    isWhitePieces = false;
+    isWhitePieces = isWhite;
 }
 
 int ComputerBoard::doComputerMove() {
@@ -29,28 +28,12 @@ int ComputerBoard::doComputerMove() {
 }
 
 int ComputerBoard::submitPlayerMove(Move m) {
-    int status;
-
-    if (mainBoard.isValidMove(m)) {
-        status = mainBoard.doMove(m);
-        return status;
-    }
-
-    return -1;
+    return mainBoard.doMove(m);
 }
 
 Move ComputerBoard::selectRandomMove(vector<Move> *moves) {
     int index = rand() % moves->size();
     return moves->at(index);
-}
-
-int ComputerBoard::setValueFromStatus(int status) {
-    if (status == whiteWins)
-        return 1000;
-    else if (status == blackWins)
-        return -1000;
-    else
-        return 0;
 }
 
 void ComputerBoard::sortEvals() {
@@ -95,35 +78,35 @@ Move ComputerBoard::bruteForce() {
     // wait for brute forcing to finish
     threadPool->waitUntilDone();
 
-    // order moves based on score
-    sortEvals();
-
-    /*for (int i = 0; i < moveEvals.size(); i++) { // debug - display move evals
-        cout << mainBoard.moveToNotationNoUpdate(moveEvals[i].first) << " [" << moveEvals[i].second << "]" << endl;
-    }*/
-
-    // remove all moves that are not tied for the best
-    int numMoves = 1;
-    for (; numMoves < moveEvals.size(); numMoves++) {
-        if (moveEvals[numMoves].second != moveEvals[0].second)
-            break;
+    /*sortEvals();
+    for (int i = 0; i < moveEvals.size(); i++) { // debug - display move evals
+        cout << mainBoard.moveToNotation(moveEvals[i].first) << " [" << moveEvals[i].second << "]" << endl;
     }
-    moveEvals.resize(numMoves);
-
-    if (numMoves == 1)
-        return moveEvals[0].first;
+    cout << endl;*/
 
     // after primary search is finished, do a secondary search for moves with the same evaluation
-    for (int i = 0; i < moveEvals.size(); i++) {
-        moveEvals[i].second = secondaryEval(moveEvals[i].first);
+    if (isWhitePieces) {
+        for (int i = 0; i < moveEvals.size(); i++) {
+            moveEvals[i].second = moveEvals[i].second*8 + secondaryEvalWhite(moveEvals[i].first);
+        }
+    }
+    else {
+        for (int i = 0; i < moveEvals.size(); i++) {
+            moveEvals[i].second = moveEvals[i].second*8 - secondaryEvalBlack(moveEvals[i].first);
+        }
     }
 
     // select best move
     sortEvals();
+
+    /*for (int i = 0; i < moveEvals.size(); i++) { // debug - display move evals
+        cout << mainBoard.moveToNotation(moveEvals[i].first) << " (" << moveEvals[i].second << ")" << endl;
+    }*/
+
     return moveEvals[0].first;
 }
 
-int ComputerBoard::secondaryEval(Move m) {
+int ComputerBoard::secondaryEvalWhite(Move m) {
     // scores a move based on how well it develops/takes space/protects king
     char piece = mainBoard.getPos(m.from);
 
@@ -131,7 +114,8 @@ int ComputerBoard::secondaryEval(Move m) {
     bool movesKing = false;
     int centerDist = 0;
     bool developsPiece = false;
-    bool pawnPush = false;
+    bool queenOut = false;
+    int pawnPush = 0;
     int totalMaterial = 0;
 
     // get information positional information about the move
@@ -141,56 +125,50 @@ int ComputerBoard::secondaryEval(Move m) {
         else
             movesKing = true;
     }
-    else if (piece == blackKing) {
-        if (m.from == 4 && (m.to == 6 || m.to == 2))
-           isCastle = true;
-        else
-            movesKing = true;
-    }
-
-    if (abs(piece) == whitePawn) { // only care about staying in the center for pawns
-        if ((m.to & 7) <= 3)
-            centerDist = 3 - (m.to & 7);
+    else if (piece == whitePawn) {
+        if (FILE(m.to) <= 3) // pawn center distance
+            centerDist = 3 - FILE(m.to);
         else // rank >= 4
-            centerDist = (m.to & 7) - 4;
+            centerDist = FILE(m.to) - 4;
+
+        if (RANK(m.from) == 6 && RANK(m.to) == 4) // pawn forward moving
+            pawnPush = 2;
+        else
+            pawnPush = 1;
     }
 
-    if ((m.from >> 3) == 7 && isWhitePieces) {
+    if (RANK(m.from) == 7) {
         if (piece == whiteKnight || piece == whiteBishop)
             developsPiece = true;
     }
-    else if ((m.from >> 3) == 0 && !isWhitePieces) {
-        if (piece == blackKnight || piece == blackBishop)
-            developsPiece = true;
-    }
-
-    if (abs(piece) == whitePawn)
-        pawnPush = true;
 
     for (int i = 0; i < 64; i++) {
-        totalMaterial += abs( mainBoard.getPieceValue(mainBoard.getPos(i)) );
+        totalMaterial += abs( getPieceValue(mainBoard.getPos(i)) );
     }
+
+    if (piece == whiteQueen && RANK(m.to) < 6)
+        queenOut = true;
 
 
     // weight the given information and calculate score
     int score;
     if (totalMaterial >= 68)  { // early game
         score = (
-            isCastle * 10 + 
-            movesKing * -10 +
+            isCastle * 7 + 
+            movesKing * -7 +
             centerDist * -2 +
             developsPiece * 3 +
-            pawnPush * 4 +
-            (abs(piece) == whiteQueen) * -2
+            pawnPush * 2 +
+            queenOut * -2
         );
     }
     else if (totalMaterial >= 35) { // middle game
         score = (
-            isCastle * 10 + 
-            movesKing * -10 +
+            isCastle * 7 + 
+            movesKing * -7 +
             centerDist * -1 +
             developsPiece * 4 +
-            pawnPush * 3
+            pawnPush * 2
         );
     }
     else { // endgame
@@ -199,15 +177,118 @@ int ComputerBoard::secondaryEval(Move m) {
         );
     }
 
-    if (!isWhitePieces)
-        score = -score;
+    return score;
+}
 
-    //cout << mainBoard.moveToNotationNoUpdate(m) << " (" << score << ")" << endl;
+int ComputerBoard::secondaryEvalBlack(Move m) {
+    // scores a move based on how well it develops/takes space/protects king
+    char piece = mainBoard.getPos(m.from);
+
+    bool isCastle = false;
+    bool movesKing = false;
+    int centerDist = 0;
+    bool developsPiece = false;
+    bool queenOut = false;
+    int pawnPush = 0;
+    int totalMaterial = 0;
+
+    // get information positional information about the move
+    if (piece == blackKing) {
+        if (m.from == 4 && (m.to == 6 || m.to == 2))
+           isCastle = true;
+        else
+            movesKing = true;
+    }
+    else if (piece == blackPawn) {
+        if (FILE(m.to) <= 3) // pawn center distance
+            centerDist = 3 - FILE(m.to);
+        else // rank >= 4
+            centerDist = FILE(m.to) - 4;
+
+        if (RANK(m.from) == 1 && RANK(m.to) == 3) // pawn forward moving
+            pawnPush = 2;
+        else
+            pawnPush = 1;
+    }
+
+    if (RANK(m.from) == 0) {
+        if (piece == blackKnight || piece == blackBishop)
+            developsPiece = true;
+    }
+
+    for (int i = 0; i < 64; i++) {
+        totalMaterial += abs( getPieceValue(mainBoard.getPos(i)) );
+    }
+
+    if (piece == blackQueen && RANK(m.to) > 0) {
+        queenOut = true;
+    }
+
+    // weight the given information and calculate score
+    int score;
+    if (totalMaterial >= 68)  { // early game
+        score = (
+            isCastle * 7 + 
+            movesKing * -7 +
+            centerDist * -2 +
+            developsPiece * 3 +
+            pawnPush * 2 +
+            queenOut * -2
+        );
+    }
+    else if (totalMaterial >= 35) { // middle game
+        score = (
+            isCastle * 7 + 
+            movesKing * -7 +
+            centerDist * -1 +
+            developsPiece * 4 +
+            pawnPush * 2
+        );
+    }
+    else { // endgame
+        score = (
+            pawnPush * 1
+        );
+    }
+
     return score;
 }
 
 int ComputerBoard::scoreBoard(Board *b) {
     return b->getMaterialDiff();
+}
+
+int ComputerBoard::getPieceValue(char piece) {
+    switch (piece) {
+        case whiteKing:
+        case blackKing:
+        case noPiece:
+            return 0;
+
+        case whiteQueen:
+            return 9;
+        case whiteRook:
+            return 5;
+        case whiteBishop:
+            return 3;
+        case whiteKnight:
+            return 3;
+        case whitePawn:
+            return 1;
+
+        case blackQueen:
+            return -9;
+        case blackRook:
+            return -5;
+        case blackBishop:
+            return -3;
+        case blackKnight:
+            return -3;
+        case blackPawn:
+            return -1;
+    }
+
+    return 0;
 }
 
 // shorthand callback for threads
@@ -225,11 +306,9 @@ void ComputerBoard::evalMove() {
     // eval move
     int value, status;
     Board b(mainBoard);
-    status = b.doMove(m);
-    if (status != gameNotOver)
-        value = setValueFromStatus(status) * startDepth;
-    else
-        value = evalPos(&b, startDepth - 1, -10000, 10000);
+    b.doMove(m);
+
+    value = evalPos(&b, startDepth - 1, -10000, 10000);
 
     // submit value SAFELY
     evalMutex.lock();
@@ -248,42 +327,50 @@ int ComputerBoard::evalPos(Board *startingBoard, int depth, int alpha, int beta)
     if (depth == 0)
         return scoreBoard(startingBoard);
 
-    vector<Move> *moves = startingBoard->getAllValidMoves();
-    if (moves->size() == 0)
-        return 0;
-
     Board b;
-    int status, value;
+    int value, stop;
+    std::function<void(Move)> callback;
+
     if (startingBoard->getIsWhitesTurn()) {
         value = -10000;
-        for (Move m : *moves) {
+        callback = [&] (Move m) {
             b = *startingBoard;
-            status = b.doMove(m);
-            if (status != gameNotOver)
-                value = setValueFromStatus(status) * depth;  // depth will be higher the closer the checkmate is
-            else
+            if (b.doMove(m) != invalidMove) {
                 value = max(value, evalPos(&b, depth - 1, alpha, beta));
 
-            alpha = max(alpha, value);
-            if (value >= beta)
-                break;
-        }
-        return value;
+                alpha = max(alpha, value);
+                if (value >= beta)
+                   stop = 1;
+            }
+        };
     }
     else {
         value = 10000;
-        for (Move m : *moves) {
+        callback = [&] (Move m) {
             b = *startingBoard;
-            status = b.doMove(m);
-            if (status != gameNotOver)
-                value = setValueFromStatus(status) * depth;  // depth will be higher the closer the checkmate is
-            else
+            if (b.doMove(m) != invalidMove) {
                 value = min(value, evalPos(&b, depth - 1, alpha, beta));
 
-            beta = min(beta, value);
-            if (value <= alpha)
-                break;
-        }
-        return value;
+                beta = min(beta, value);
+                if (value <= alpha)
+                    stop = 1;
+            }
+        };
     }
+
+    stop = 0;
+    startingBoard->startMoveGenerator(callback, &stop);
+    
+    if (abs(value) == 10000) { // no moves possible, game is over
+        if (startingBoard->isCheck()) {
+            if (startingBoard->getIsWhitesTurn())
+                return -1000 * depth; // black wins
+            else
+                return 1000 * depth; // white wins
+        }
+        return 0; // stalemate
+    }
+
+    return value;
 }
+
