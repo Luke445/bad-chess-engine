@@ -329,13 +329,13 @@ int ComputerBoard::evalPos(Board *startingBoard, int depth, int alpha, int beta)
 
     Board b;
     int value, stop;
-    std::function<void(Move)> callback;
+    std::function<void(Move, char)> callback;
 
     if (startingBoard->getIsWhitesTurn()) {
         value = -10000;
-        callback = [&] (Move m) {
+        callback = [&] (Move m, char piece) {
             b = *startingBoard;
-            if (b.doMove(m) != invalidMove) {
+            if (b.quickDoMoveWhite(m, piece) != invalidMove) {
                 value = max(value, evalPos(&b, depth - 1, alpha, beta));
 
                 alpha = max(alpha, value);
@@ -346,9 +346,9 @@ int ComputerBoard::evalPos(Board *startingBoard, int depth, int alpha, int beta)
     }
     else {
         value = 10000;
-        callback = [&] (Move m) {
+        callback = [&] (Move m, char piece) {
             b = *startingBoard;
-            if (b.doMove(m) != invalidMove) {
+            if (b.quickDoMoveBlack(m, piece) != invalidMove) {
                 value = min(value, evalPos(&b, depth - 1, alpha, beta));
 
                 beta = min(beta, value);

@@ -12,6 +12,8 @@ private:
     std::string moveToNotationInternal(Move m);
 
 public:
+    void resetBoard();
+
     int doMove(Move m);
 
     bool isValidMove(Move m);

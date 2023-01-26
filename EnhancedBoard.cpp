@@ -4,6 +4,15 @@
 
 using namespace std;
 
+void EnhancedBoard::resetBoard() {
+    moveList.clear();
+    validMoves.clear();
+    movesPlayed = 0;
+    gameStatus = gameNotOver;
+
+    Board::resetBoard();
+}
+
 int EnhancedBoard::doMove(Move m) {
     if (isValidMove(m)) {
         Board::doMove(m);
@@ -45,7 +54,7 @@ vector<Move> * EnhancedBoard::getAllValidMoves() {
     if (validMoves.empty()) {
         Board newBoard;
 
-        auto callback = [&] (Move m) {
+        auto callback = [&] (Move m, char piece) {
             newBoard = *this;
             int status = newBoard.doMove(m);
             if (status != invalidMove) {
@@ -269,7 +278,7 @@ void EnhancedBoard::exportToPGN(string filepath) {
 
     // reset the board data and then play through all the moves again
     // to restore the original board and create the pgn notation
-    resetBoard();
+    Board::resetBoard();
     for (int i = 0; i < moveList.size(); i++) {
         if (isWhiteMove) {
             f << to_string(curMove++) << ". " << moveToNotationInternal(moveList.at(i)) << " ";
@@ -333,10 +342,10 @@ bool EnhancedBoard::isPosWhite(int pos) {
 }
 
 Move EnhancedBoard::getLastMove() {
-    if (movesPlayed == 0)
+    if (moveList.size() == 0)
         return {-1, -1};
     else
-        return lastMove;
+        return moveList.at(moveList.size() - 1);
 }
 
 int EnhancedBoard::getStatus() {

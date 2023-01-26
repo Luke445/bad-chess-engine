@@ -39,12 +39,6 @@ struct Move {
 
 class Board {
 protected:
-    bool isWhitesTurn;
-    Move lastMove;
-    bool whiteKingSideCastle, whiteQueenSideCastle, blackKingSideCastle, blackQueenSideCastle;
-    int blackKingPos;
-    int whiteKingPos;
-
     uint64_t whitePawnBB;
     uint64_t whiteKnightBB;
     uint64_t whiteBishopBB;
@@ -54,6 +48,13 @@ protected:
     uint64_t blackKnightBB;
     uint64_t blackBishopBB;
     uint64_t blackRookBB;
+
+    int blackKingPos;
+    int whiteKingPos;
+
+    int enPassantTarget;
+    bool isWhitesTurn;
+    bool whiteKingSideCastle, whiteQueenSideCastle, blackKingSideCastle, blackQueenSideCastle;
 
 public:
     Board();
@@ -66,31 +67,35 @@ public:
 
     int doMove(Move m);
 
+    int quickDoMoveWhite(Move m, char piece);
+
+    int quickDoMoveBlack(Move m, char piece);
+
     bool isCheck();
 
     bool isWhiteInCheck(uint64_t allPiecesBB);
 
     bool isBlackInCheck(uint64_t allPiecesBB);
 
-    void startMoveGenerator(std::function<void(Move)> func, int *stop);
+    void startMoveGenerator(std::function<void(Move, char)> func, int *stop);
 
-    void getMovesForWhitePiece(std::function<void(Move)> func, int pos, uint64_t whiteBB, uint64_t blackBB, uint64_t allBB);
+    void getMovesForWhitePiece(std::function<void(Move, char)> func, int pos, uint64_t whiteBB, uint64_t blackBB, uint64_t allBB);
     
-    void getMovesForBlackPiece(std::function<void(Move)> func, int pos, uint64_t whiteBB, uint64_t blackBB, uint64_t allBB);
+    void getMovesForBlackPiece(std::function<void(Move, char)> func, int pos, uint64_t whiteBB, uint64_t blackBB, uint64_t allBB);
 
-    void getWhiteKingMoves(std::function<void(Move)> func, int pos, uint64_t allPiecesBB, uint64_t sameColorBB);
+    void getWhiteKingMoves(std::function<void(Move, char)> func, int pos, uint64_t allPiecesBB, uint64_t sameColorBB);
 
-    void getBlackKingMoves(std::function<void(Move)> func, int pos, uint64_t allPiecesBB, uint64_t sameColorBB);
+    void getBlackKingMoves(std::function<void(Move, char)> func, int pos, uint64_t allPiecesBB, uint64_t sameColorBB);
 
-    void getRookMoves(std::function<void(Move)> func, int pos, uint64_t allPiecesBB, uint64_t sameColorBB);
+    void getRookMoves(std::function<void(Move, char)> func, int pos, uint64_t allPiecesBB, uint64_t sameColorBB);
 
-    void getBishopMoves(std::function<void(Move)> func, int pos, uint64_t allPiecesBB, uint64_t sameColorBB);
+    void getBishopMoves(std::function<void(Move, char)> func, int pos, uint64_t allPiecesBB, uint64_t sameColorBB);
 
-    void getKnightMoves(std::function<void(Move)> func, int pos, uint64_t sameColorBB);
+    void getKnightMoves(std::function<void(Move, char)> func, int pos, uint64_t sameColorBB);
 
-    void getWhitePawnMoves(std::function<void(Move)> func, int pos, uint64_t allPiecesBB, uint64_t oppositeColorBB);
+    void getWhitePawnMoves(std::function<void(Move, char)> func, int pos, uint64_t allPiecesBB, uint64_t oppositeColorBB);
 
-    void getBlackPawnMoves(std::function<void(Move)> func, int pos, uint64_t allPiecesBB, uint64_t oppositeColorBB);
+    void getBlackPawnMoves(std::function<void(Move, char)> func, int pos, uint64_t allPiecesBB, uint64_t oppositeColorBB);
 
     int getMaterialDiff();
 

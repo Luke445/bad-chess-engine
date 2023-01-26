@@ -2,7 +2,7 @@ CC = g++
 CFLAGS = -O3 -std=c++11
 
 BadChess : main.o Board.o Computer.o EnhancedBoard.o Gui.o Threads.o
-	$(CC) $(CFLAGS) -o ./BadChess *.o -lSDL2 -lSDL2_image
+	$(CC) $(CFLAGS) -o ./BadChess *.o -lSDL2 -lSDL2_image -lprofiler
 	rm *.o
 
 Board.o : Board.cpp Board.h Data.h

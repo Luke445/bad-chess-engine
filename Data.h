@@ -18,14 +18,14 @@ const char startingBoard[64] = {
 };
 #else
 const char startingBoard[64] = {
+    noPiece,   noPiece,     noPiece,     noPiece,    blackKing,   noPiece,     noPiece,     noPiece  ,
     noPiece,   noPiece,     noPiece,     noPiece,    noPiece,   noPiece,     noPiece,     noPiece  ,
     noPiece,   noPiece,     noPiece,     noPiece,    noPiece,   noPiece,     noPiece,     noPiece  ,
     noPiece,   noPiece,     noPiece,     noPiece,    noPiece,   noPiece,     noPiece,     noPiece  ,
-    noPiece,   noPiece,     noPiece,     noPiece,    noPiece,   noPiece,     whiteKing,     noPiece  ,
-    noPiece,   noPiece,     noPiece,     noPiece,    noPiece,   noPiece,     noPiece,     noPiece  ,
-    noPiece,   noPiece,     noPiece,     blackKing,    noPiece,   noPiece,     noPiece,     noPiece  ,
     noPiece,   noPiece,     noPiece,     noPiece,    noPiece,   noPiece,     noPiece,     noPiece  ,
     noPiece,   noPiece,     noPiece,     noPiece,    noPiece,   noPiece,     noPiece,     noPiece  ,
+    noPiece,   noPiece,     noPiece,     noPiece,    noPiece,   noPiece,     noPiece,     noPiece  ,
+    noPiece,   noPiece,     noPiece,     noPiece,    whiteKing,   noPiece,     noPiece,     noPiece  ,
 };
 #endif
 
