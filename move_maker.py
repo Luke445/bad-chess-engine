@@ -14,11 +14,10 @@ def FILE(x):
 def RANK(x):
     return x >> 3
 
-def getMovesForPos(pos):
+def getBishopMovesForPos(pos):
     out = []
     sectionIndex = 0;
 
-    # --- bishop moves ---
     # up left
     for next in range(pos-9, MIN_BOARD-1, -9):
         if FILE(next) == 7:
@@ -48,8 +47,13 @@ def getMovesForPos(pos):
     out.insert(sectionIndex, (len(out) + 1))
     sectionIndex = len(out)
 
+    return out
 
-    # --- rook moves ---
+
+def getRookMovesForPos(pos):
+    out = []
+    sectionIndex = 0;
+
     # up
     for next in range(pos-8, MIN_BOARD-1, -8):
         out.append(next)
@@ -72,15 +76,6 @@ def getMovesForPos(pos):
     # down
     for next in range(pos+8, MAX_BOARD+1, 8):
         out.append(next)
-    out.insert(sectionIndex, (len(out) + 1))
-    sectionIndex = len(out)
-
-
-    # --- knight moves ---
-    for offset in KNIGHT_OFFSETS:
-        next = pos + offset
-        if next in range(0, 64) and abs(FILE(next) - FILE(pos)) <= 2:
-            out.append(next)
     out.insert(sectionIndex, (len(out) + 1))
     sectionIndex = len(out)
 
@@ -206,31 +201,61 @@ def printBitBoard(board):
 for i in range(64):
     moves = getMovesForPos2(i);
 
-    print(f"const uint64_t pos{i}[{len(moves)}] = {{{ ', '.join(map(hex, moves)) }}};")
+    print(f"const uint64_t checksPos{i}[{len(moves)}] = {{{ ', '.join(map(hex, moves)) }}};")
 
 print("const uint64_t *checkBitBoards[64] = {", end="")
 for i in range(63):
-    print(f"pos{i}, ", end="")
-print("pos63};")
+    print(f"checksPos{i}, ", end="")
+print("checksPos63};")
+
+print()
+
+# bishops
+for i in range(64):
+    moves = getBishopMovesForPos(i);
+
+    print(f"const int8_t bishopsPos{i}[{len(moves)}] = {{{ ', '.join(map(str, moves)) }}};")
+
+print("const int8_t *bishopMoves[64] = {", end="")
+for i in range(63):
+    print(f"bishopsPos{i}, ", end="")
+print("bishopsPos63};")
+
+print()
+
+# rooks
+for i in range(64):
+    moves = getRookMovesForPos(i);
+
+    print(f"const int8_t rooksPos{i}[{len(moves)}] = {{{ ', '.join(map(str, moves)) }}};")
+
+print("const int8_t *rookMoves[64] = {", end="")
+for i in range(63):
+    print(f"rooksPos{i}, ", end="")
+print("rooksPos63};")
+
+print()
 
 # knights
 for i in range(64):
     moves = getKnightMovesForPos(i);
 
-    print(f"const int knightsPos{i}[{len(moves)}] = {{{ ', '.join(map(str, moves)) }}};")
+    print(f"const int8_t knightsPos{i}[{len(moves)}] = {{{ ', '.join(map(str, moves)) }}};")
 
-print("const int *knightMoves[64] = {", end="")
+print("const int8_t *knightMoves[64] = {", end="")
 for i in range(63):
     print(f"knightsPos{i}, ", end="")
 print("knightsPos63};")
+
+print()
 
 # kings
 for i in range(64):
     moves = getKingMovesForPos(i);
 
-    print(f"const int kingsPos{i}[{len(moves)}] = {{{ ', '.join(map(str, moves)) }}};")
+    print(f"const int8_t kingsPos{i}[{len(moves)}] = {{{ ', '.join(map(str, moves)) }}};")
 
-print("const int *kingsPos[64] = {", end="")
+print("const int8_t *kingMoves[64] = {", end="")
 for i in range(63):
     print(f"kingsPos{i}, ", end="")
 print("kingsPos63};")

@@ -93,9 +93,11 @@ computerStarts:
 void playWithComputerGui(Move *sharedMove) {
     Move m;
     int status;
-    if (isComputerWhite)
+    if (isComputerWhite) {
+        this_thread::sleep_for(chrono::milliseconds(1000)); // wait for gui
         goto computerStarts;
-
+    }
+    
     while (true) {
         m = getPlayerMoveGui(sharedMove);
         if (m.to == -1)
@@ -160,7 +162,7 @@ void createThreadsGui(int depth) {
 
     profileStart();
     uint64_t allPiecesBB = b->getAllPiecesBB();
-    for (int i = 0; i < 100000000; i++) {
+    for (int i = 0; i < 1000000; i++) {
         volatile bool x = b->isBlackInCheck(allPiecesBB);
     }
     profileEnd();
@@ -180,6 +182,7 @@ void createThreadsGui(int depth) {
 int main(int argc, char *argv[]) {
     bool noGui = false;
     int depth = 6;
+
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--nogui") == 0) {
             noGui = true;

@@ -16,6 +16,9 @@ ComputerBoard::ComputerBoard(Threads *t, int d, bool isWhite) {
 }
 
 int ComputerBoard::doComputerMove() {
+    //cout << "white doubled pawns: " << doubledPawns(mainBoard.whitePawnBB) << endl;
+    //cout << "black doubled pawns: " << doubledPawns(mainBoard.blackPawnBB) << endl;
+
     auto start = high_resolution_clock::now();
     Move m = bruteForce();
     auto stop = high_resolution_clock::now();
@@ -104,6 +107,171 @@ Move ComputerBoard::bruteForce() {
     }*/
 
     return moveEvals[0].first;
+}
+
+void ComputerBoard::evalMove() {
+    // get move SAFELY
+    queueMutex.lock();
+
+    if (evalQueue.empty())
+        return;
+    Move m = evalQueue.front();
+    evalQueue.pop();
+
+    queueMutex.unlock();
+
+    // eval move
+    int value, status;
+    Board b(mainBoard);
+    b.doMove(m);
+
+    value = evalPos(&b, startDepth - 1, -10000, 10000);
+    /*if (b.isWhitesTurn)
+        value = b.evalPosWhite(startDepth - 1, -10000, 10000);
+    else
+        value = b.evalPosBlack(startDepth - 1, -10000, 10000);*/
+
+    // submit value SAFELY
+    evalMutex.lock();
+
+    moveEvals.push_back(pair<Move, int> {m, value});
+
+    evalMutex.unlock();
+}
+
+/*
+ * implements an alpha-beta algorithm that scores the
+ * given position based on material difference
+ * depth - moves to search in plies
+ */
+int evalPos(Board *startingBoard, int depth, int alpha, int beta) {
+    if (depth == 0)
+        return scoreBoard(startingBoard);
+
+    //Board b;
+    //int value, stop;
+    Eval test;
+    test.startingBoard = startingBoard;
+    test.depth = depth;
+    test.alpha = alpha;
+    test.beta = beta;
+    test.stop = 0;
+
+    if (startingBoard->isWhitesTurn) {
+        test.value = -10000;
+        startingBoard->getAllMovesWhite(evalWhite, &test);
+    }
+    else {
+        test.value = 10000;
+        startingBoard->getAllMovesBlack(evalBlack, &test);
+    }
+
+    if (abs(test.value) == 10000) { // no moves possible, game is over
+        if (test.startingBoard->isCheck()) {
+            if (test.startingBoard->isWhitesTurn)
+                return -1000 * test.depth; // black wins
+            else
+                return 1000 * test.depth; // white wins
+        }
+        return 0; // stalemate
+    }
+
+    return test.value;
+}
+/*
+struct Eval {
+    Board b;
+    int value;
+    int stop;
+    Board *startingBoard;
+    int depth;
+    int alpha;
+    int beta;
+};
+*/
+
+void evalWhite(Eval *e, Move m, char piece) {
+    e->b = *e->startingBoard;
+    if (e->b.doMoveWhite(m, piece) != invalidMove) {
+        e->value = max(e->value, evalPos(&e->b, e->depth - 1, e->alpha, e->beta));
+
+        e->alpha = max(e->alpha, e->value);
+        if (e->value >= e->beta)
+           e->stop = 1;
+    }
+}
+
+void evalBlack(Eval *e, Move m, char piece) {
+    e->b = *e->startingBoard;
+    if (e->b.doMoveBlack(m, piece) != invalidMove) {
+        e->value = min(e->value, evalPos(&e->b, e->depth - 1, e->alpha, e->beta));
+
+        e->beta = min(e->beta, e->value);
+        if (e->value <= e->alpha)
+            e->stop = 1;
+    }
+}
+
+// popCount from https://www.chessprogramming.org/Population_Count
+const uint64_t k1 = 0x5555555555555555; /*  -1/3   */
+const uint64_t k2 = 0x3333333333333333; /*  -1/5   */
+const uint64_t k4 = 0x0f0f0f0f0f0f0f0f; /*  -1/17  */
+const uint64_t kf = 0x0101010101010101; /*  -1/255 */
+int popCount(uint64_t x) {
+    x =  x       - ((x >> 1)  & k1); /* put count of each 2 bits into those 2 bits */
+    x = (x & k2) + ((x >> 2)  & k2); /* put count of each 4 bits into those 4 bits */
+    x = (x       +  (x >> 4)) & k4 ; /* put count of each 8 bits into those 8 bits */
+    x = (x * kf) >> 56; /* returns 8 most significant bits of x + (x<<8) + (x<<16) + (x<<24) + ...  */
+    return (int) x;
+}
+
+int doubledPawns(uint64_t x) {
+    int count = (x & 0x0101010101010101) ? 1 : 0;
+    count +=    (x & 0x0202020202020202) ? 1 : 0;
+    count +=    (x & 0x0404040404040404) ? 1 : 0;
+    count +=    (x & 0x0808080808080808) ? 1 : 0;
+    count +=    (x & 0x1010101010101010) ? 1 : 0;
+    count +=    (x & 0x2020202020202020) ? 1 : 0;
+    count +=    (x & 0x4040404040404040) ? 1 : 0;
+    count +=    (x & 0x8080808080808080) ? 1 : 0;
+    return popCount(x) - count; // #total number of pawns - files with pawns
+}
+
+int getMaterialDiff(Board *b) {
+    int sum;
+    sum =  popCount(b->whitePawnBB);
+    sum += popCount(b->whiteKnightBB) * 3;
+    sum += popCount(b->whiteBishopBB) * 3;
+    sum += popCount(b->whiteRookBB) * 5;
+    sum += popCount(b->whiteBishopBB & b->whiteRookBB); // bishop and rook already counted for 8pts
+
+    sum -= popCount(b->blackPawnBB);
+    sum -= popCount(b->blackKnightBB) * 3;
+    sum -= popCount(b->blackBishopBB) * 3;
+    sum -= popCount(b->blackRookBB) * 5;
+    sum -= popCount(b->blackBishopBB & b->blackRookBB); // bishop and rook already counted for 8pts
+    return sum;
+}
+
+int getTotalMaterial(Board *b) {
+    int sum;
+    sum =  popCount(b->whitePawnBB);
+    sum += popCount(b->whiteKnightBB) * 3;
+    sum += popCount(b->whiteBishopBB) * 3;
+    sum += popCount(b->whiteRookBB) * 5;
+    sum += popCount(b->whiteBishopBB & b->whiteRookBB); // bishop and rook already counted for 8pts
+
+    sum += popCount(b->blackPawnBB);
+    sum += popCount(b->blackKnightBB) * 3;
+    sum += popCount(b->blackBishopBB) * 3;
+    sum += popCount(b->blackRookBB) * 5;
+    sum += popCount(b->blackBishopBB & b->blackRookBB); // bishop and rook already counted for 8pts
+    return sum;
+}
+
+int scoreBoard(Board *b) {
+    return getMaterialDiff(b);
+    //return getMaterialDiff(b)*8 + doubledPawns(b->blackPawnBB) - doubledPawns(b->whitePawnBB);
 }
 
 int ComputerBoard::secondaryEvalWhite(Move m) {
@@ -254,8 +422,91 @@ int ComputerBoard::secondaryEvalBlack(Move m) {
     return score;
 }
 
-int ComputerBoard::scoreBoard(Board *b) {
-    return b->getMaterialDiff();
+int ComputerBoard::positionalEvalWhite(Board *b) {
+    int kingSafety = 0;
+    bool queenOut = false;
+    int pawnPush = 0;
+    int totalMaterial = 0;
+
+    totalMaterial = getTotalMaterial(b);
+
+    const uint64_t startingRankMask = 0xFF;
+    if (((b->whiteRookBB & b->whiteBishopBB) & startingRankMask) != 0) {
+        queenOut = true;
+    }
+
+    if (b->whiteKingPos > 55) {
+        if (b->whiteKingPos == 3 || b->whiteKingPos == 4)
+            kingSafety = 0;
+        else
+            kingSafety = 1;
+    }
+    else
+        kingSafety = -1;
+
+    // weight the given information and calculate score
+    int score;
+    if (totalMaterial >= 68)  { // early game
+        score = (
+            kingSafety * 2 +
+            queenOut * -2
+        );
+    }
+    else if (totalMaterial >= 35) { // middle game
+        score = (
+            kingSafety
+        );
+    }
+    else { // endgame
+        score = (
+            0
+        );
+    }
+
+    return score;
+}
+
+int ComputerBoard::positionalEvalBlack(Board *b) {
+    int kingSafety = 0;
+    bool queenOut = false;
+    int totalMaterial = 0;
+
+    totalMaterial = getTotalMaterial(b);
+
+    const uint64_t startingRankMask = 0xFF00000000000000;
+    if (((b->blackRookBB & b->blackBishopBB) & startingRankMask) != 0) {
+        queenOut = true;
+    }
+
+    if (b->blackKingPos < 8) {
+        if (b->blackKingPos == 3 || b->blackKingPos == 4)
+            kingSafety = 0;
+        else
+            kingSafety = 1;
+    }
+    else
+        kingSafety = -1;
+
+    // weight the given information and calculate score
+    int score;
+    if (totalMaterial >= 68)  { // early game
+        score = (
+            kingSafety * 2 +
+            queenOut * -2
+        );
+    }
+    else if (totalMaterial >= 35) { // middle game
+        score = (
+            kingSafety
+        );
+    }
+    else { // endgame
+        score = (
+            0
+        );
+    }
+
+    return score;
 }
 
 int ComputerBoard::getPieceValue(char piece) {
@@ -290,87 +541,3 @@ int ComputerBoard::getPieceValue(char piece) {
 
     return 0;
 }
-
-// shorthand callback for threads
-void ComputerBoard::evalMove() {
-    // get move SAFELY
-    queueMutex.lock();
-
-    if (evalQueue.empty())
-        return;
-    Move m = evalQueue.front();
-    evalQueue.pop();
-
-    queueMutex.unlock();
-
-    // eval move
-    int value, status;
-    Board b(mainBoard);
-    b.doMove(m);
-
-    value = evalPos(&b, startDepth - 1, -10000, 10000);
-
-    // submit value SAFELY
-    evalMutex.lock();
-
-    moveEvals.push_back(pair<Move, int> {m, value});
-
-    evalMutex.unlock();
-}
-
-/*
- * implements an alpha-beta algorithm that scores the
- * given position based on material difference
- * depth - moves to search in plies
- */
-int ComputerBoard::evalPos(Board *startingBoard, int depth, int alpha, int beta) {
-    if (depth == 0)
-        return scoreBoard(startingBoard);
-
-    Board b;
-    int value, stop;
-    std::function<void(Move, char)> callback;
-
-    if (startingBoard->getIsWhitesTurn()) {
-        value = -10000;
-        callback = [&] (Move m, char piece) {
-            b = *startingBoard;
-            if (b.quickDoMoveWhite(m, piece) != invalidMove) {
-                value = max(value, evalPos(&b, depth - 1, alpha, beta));
-
-                alpha = max(alpha, value);
-                if (value >= beta)
-                   stop = 1;
-            }
-        };
-    }
-    else {
-        value = 10000;
-        callback = [&] (Move m, char piece) {
-            b = *startingBoard;
-            if (b.quickDoMoveBlack(m, piece) != invalidMove) {
-                value = min(value, evalPos(&b, depth - 1, alpha, beta));
-
-                beta = min(beta, value);
-                if (value <= alpha)
-                    stop = 1;
-            }
-        };
-    }
-
-    stop = 0;
-    startingBoard->startMoveGenerator(callback, &stop);
-    
-    if (abs(value) == 10000) { // no moves possible, game is over
-        if (startingBoard->isCheck()) {
-            if (startingBoard->getIsWhitesTurn())
-                return -1000 * depth; // black wins
-            else
-                return 1000 * depth; // white wins
-        }
-        return 0; // stalemate
-    }
-
-    return value;
-}
-

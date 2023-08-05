@@ -32,13 +32,35 @@ public:
 
     int secondaryEvalWhite(Move m);
 
+    int positionalEvalWhite(Board *b);
+
     int secondaryEvalBlack(Move m);
 
-    int scoreBoard(Board *b);
+    int positionalEvalBlack(Board *b);
 
     int getPieceValue(char piece);
 
-    void evalMove();
+    int evalPosThreaded(Board *startingBoard, int depth, int min, int max);
 
-    int evalPos(Board *startingBoard, int depth, int min, int max);
+    int threadedEval(Board *startingBoard, int depth, int alpha, int beta);
+
+    void evalMove();
 };
+
+int evalPos(Board *startingBoard, int depth, int min, int max);
+
+void evalBlack(Eval *e, Move m, char piece);
+
+void evalWhite(Eval *e, Move m, char piece);
+
+int popCount(uint64_t BB);
+
+int doubledPawns(uint64_t pawnBB);
+
+int getMaterialDiff(Board *b);
+
+int getTotalMaterial(Board *b);
+
+int scoreBoard(Board *b);
+
+

@@ -11,6 +11,8 @@ void EnhancedBoard::resetBoard() {
     gameStatus = gameNotOver;
 
     Board::resetBoard();
+
+    getAllValidMoves();
 }
 
 int EnhancedBoard::doMove(Move m) {
@@ -54,16 +56,20 @@ vector<Move> * EnhancedBoard::getAllValidMoves() {
     if (validMoves.empty()) {
         Board newBoard;
 
-        auto callback = [&] (Move m, char piece) {
-            newBoard = *this;
-            int status = newBoard.doMove(m);
+        Eval e;
+        e.startingBoard = this;
+        
+        auto callback = [] (Eval *e, Move m, char piece) {
+            e->b = *e->startingBoard;
+            int status = e->b.doMove(m);
+            EnhancedBoard *this_ = (EnhancedBoard *) e->startingBoard; // bit of a hack
             if (status != invalidMove) {
-                validMoves.push_back(m);
+                this_->validMoves.push_back(m);
             }
         };
 
-        int stop = 0;
-        startMoveGenerator(callback, &stop);
+        e.stop = 0;
+        getAllMoves(callback, &e);
     }
 
     return &validMoves;
@@ -90,12 +96,11 @@ string EnhancedBoard::getPieceStr(char piece) {
 }
 
 Move EnhancedBoard::notationToMove(string m) {
-    try {
+    return {0, 0};
+    /*try {
         // remove trailing + or #
         if (m.compare(m.size() - 1, 1, "+") == 0 || m.compare(m.size() - 1, 1, "#") == 0)
             m = m.substr(0, m.size() - 1);
-
-        cout << m << endl;
 
         // castling
         if (m == "O-O") {
@@ -113,34 +118,75 @@ Move EnhancedBoard::notationToMove(string m) {
         // first check for promotion
         if (m.compare(m.size() - 2, 1, "=") == 0) // just remove for now TODO
             m = m.substr(0, m.size() - 2);
-        // then parse the desination TODO
-        cout << m << endl;
-        int to = 0;
+
+        int to_rank = 8 - stoi(m.substr(m.size() - 1, m.size()));
+        if (to_rank < 0 || to_rank > 7)
+            return {0, 0};
+        int to_file = ((char) m[m.size() - 2]) - 97;
+        if (to_file < 0 || to_file > 7)
+            return {0, 0};
+
+        cout << to_rank << " " << to_file << endl;
+
         m = m.substr(0, m.size() - 2);
-        cout << m;
+        cout << "1. " << m << endl;
+        int from_rank, from_file;
         switch (m.size()) {
-            case 3: // Qa3 - super easy
-                break;
+            case 3: // non-pawn move with both rank and file
+                from_rank = 8 - stoi(m.substr(1, 2));
+                if (from_rank < 0 || from_rank > 7)
+                    return {-1, -1};
+                from_file = ((char) m[1]) - 97;
+                if (from_file < 0 || from_file > 7)
+                    return {0, 0};
+                return {from_rank*8 + from_file, to_rank*8 + to_file};
             case 2: // pawn capture or piece move with rank/file
-                break;
-            case 1: // non-pawn move
-                break;
+                if (m[1] == 'x') { // pawn capture
+                    from_file = ((char) m[0]) - 97;
+                    if (from_file < 0 || from_file > 7)
+                        return {0, 0};
+                    if (isWhitesTurn)
+                        return {(to_rank + 1)*8 + from_file, to_rank*8 + to_file};
+                    else
+                        return {(to_rank - 1)*8 + from_file, to_rank*8 + to_file};
+                }
+                try {
+                    from_rank = 8 - stoi(m.substr(1, 2));
+                    if (from_rank < 0 || from_rank > 7)
+                        return {0, 0};
+                    // non-pawn move with rank data TODO
+                    return {0, 0};
+                }
+                catch (...) {
+                    from_file = ((char) m[1]) - 97;
+                    if (from_file < 0 || from_file > 7)
+                        return {0, 0};
+                    // non-pawn move with file data TODO
+                    return {0, 0};
+                }
+            case 1: // non-pawn move TODO
+                return {0, 0};
             case 0: // (nothing) - pawn push 
-                break;
+                // TODO: promotion
+                if (isWhitesTurn) {
+                    if (getPos((to_rank + 1)*8 + to_file) == whitePawn)
+                        return {(to_rank + 1)*8 + to_file, to_rank*8 + to_file};
+                    else
+                        return {(to_rank + 2)*8 + to_file, to_rank*8 + to_file};
+                }
+                else {
+                    if (getPos((to_rank - 1)*8 + to_file) == blackPawn)
+                        return {(to_rank - 1)*8 + to_file, to_rank*8 + to_file};
+                    else
+                        return {(to_rank - 2)*8 + to_file, to_rank*8 + to_file};
+                }
+            default:
+                return {0, 0};
         }
-        // TODO the rest...
-        // possible data left
-        // Qa3
-        // Qa
-        // Q3
-        // hx
-        // Q
-        // (nothing)
-
-
     }
-    catch (...) {}
-    return {};
+    catch (...) {
+        return {0, 0};
+    }*/
 }
 
 string EnhancedBoard::moveToNotation(Move m) {
@@ -158,7 +204,6 @@ string EnhancedBoard::moveToNotationInternal(Move m) {
     to = ((char) FILE(m.to) + 97);
     to += to_string(8 - RANK(m.to));
     char piece = getPos(m.from);
-    bool isCapture = getPos(m.to) != noPiece;
     bool multiplePieces = false;
     bool sameFile = false;
     bool sameRank = false;
@@ -187,29 +232,25 @@ string EnhancedBoard::moveToNotationInternal(Move m) {
     }
 
     if (abs(piece) == whitePawn) {
-        // check for en passant  
-        if (FILE(m.from) != FILE(m.to) && !isCapture)
-            isCapture = true;
+        if (FILE(m.from) != FILE(m.to)) // pawn capturing
+            out = from.substr(0, 1) + "x";
+        else // no capture - push
+            out = "";
 
-        if (isCapture)
-            out = from.substr(0, 1) + "x" + to;
-        else {
-            if ((RANK(m.from) == 1 && piece == whitePawn) || 
-                (RANK(m.from) == 6 && piece == blackPawn)
-            ) { // promoting
-                if (piece == whitePawn) // rank holds promotion piece, get rank manually
-                    out = to.substr(0, 1) + "8";
-                else
-                    out = to.substr(0, 1) + "1";
-                if (RANK(m.to) == whiteBishop || RANK(m.to) == whiteKnight || RANK(m.to) == whiteRook)
-                    out += "=" + getPieceStr(RANK(m.to));
-                else
-                    out += "=Q";
-            }
+        if ((RANK(m.from) == 1 && piece == whitePawn) || 
+            (RANK(m.from) == 6 && piece == blackPawn)
+        ) { // promoting
+            if (piece == whitePawn) // rank holds promotion piece, get rank manually
+                out += to.substr(0, 1) + "8";
             else
-                out += to;
+                out += to.substr(0, 1) + "1";
+            if (RANK(m.to) == whiteBishop || RANK(m.to) == whiteKnight || RANK(m.to) == whiteRook)
+                out += "=" + getPieceStr(RANK(m.to));
+            else
+                out += "=Q";
         }
-
+        else // pawn push
+            out += to;
     }
     else {
         out = getPieceStr(piece);
@@ -235,7 +276,7 @@ string EnhancedBoard::moveToNotationInternal(Move m) {
             out += from.substr(0, 1);
         }
         
-        if (isCapture)
+        if (getPos(m.to) != noPiece) // capturing
             out += "x";
         out += to;
     }

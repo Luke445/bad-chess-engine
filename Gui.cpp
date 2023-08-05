@@ -172,7 +172,7 @@ void Gui::drawChessBoardFlipped() {
             else
                 SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 
-            if (checkmatePos == pos)
+            if (checkmatePos == 63 - pos)
                 SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
 
             SDL_RenderFillRect(renderer, &rect);
@@ -263,7 +263,7 @@ void Gui::loop() {
                         promoteTo = whiteKnight;
 
                     if (promoteTo != -1) {
-                        Move m = {selectedPos, (selectedPos2 & 0b111) | (promoteTo << 3)};
+                        Move m = {static_cast<int8_t>(selectedPos), static_cast<int8_t>((selectedPos2 & 0b111) | (promoteTo << 3))};
 
                         if (b->isValidMove(m)) {
                             if (sharedMove->from == -1)
@@ -282,14 +282,14 @@ void Gui::loop() {
                 if ((b->getPos(selectedPos) == whitePawn && RANK(selectedPos) == 1) ||
                     (b->getPos(selectedPos) == blackPawn && RANK(selectedPos) == 6)) 
                 {
-                    m = {selectedPos, (FILE(mousePos) | (whiteQueen << 3))};
+                    m = {static_cast<int8_t>(selectedPos), static_cast<int8_t>((FILE(mousePos) | (whiteQueen << 3)))};
                     if (b->isValidMove(m)) {
                         selectedPos2 = mousePos;
                         promoting = true;
                     }
                 }
                 else {
-                    m = {selectedPos, mousePos};
+                    m = {static_cast<int8_t>(selectedPos), static_cast<int8_t>(mousePos)};
 
                     if (b->isValidMove(m)) {
                         if (sharedMove->from == -1)

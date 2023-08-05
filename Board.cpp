@@ -1,9 +1,29 @@
-#include <vector>
+ #include <vector>
 #include <iostream>
 #include "Board.h"
+#include "Computer.h"
 #include "Data.h"
 
 using namespace std;
+
+
+void printBB(uint64_t BB) {
+    cout << "---------------\n";
+    int tmp;
+    for (int i = 0; i < 8; i++) {
+        tmp = BB & 0xFF;
+        for (int j = 0; j < 8; j++) {
+            if (tmp & 1)
+                cout << "1 ";
+            else
+                cout << "0 ";
+            tmp >>= 1;
+        }
+        cout << "\n";
+        BB >>= 8;
+    }
+    cout << "---------------\n";
+}
 
 
 Board::Board() {}
@@ -70,10 +90,14 @@ void Board::resetBoard() {
     isWhitesTurn = true;
     enPassantTarget = 64;
     if (whiteKingPos == 64) {
-        throw runtime_error("Invalid position: No white king found!");
+        //throw runtime_error("Invalid position: No white king found!");
+        cout << "Invalid position: No white king found!\n";
+        whiteKingPos = 0;
     }
     if (blackKingPos == 64) {
-        throw runtime_error("Invalid position: No black king found!");
+        //throw runtime_error("Invalid position: No black king found!");
+        cout << "Invalid position: No black king found!\n";
+        blackKingPos = 0;
     }
 
     if (whiteKingPos == 60) {
@@ -102,166 +126,31 @@ void Board::blackCapturePos(uint64_t mask) {
     enPassantTarget = 64;
 }
 
-int Board::doMove(Move m) {
+int Board::doMove(Move m) { // not very fast
     uint64_t mask = POS_TO_BITMASK(m.from);
+    char piece;
 
-    if (isWhitesTurn) {
-        if (m.from == whiteKingPos) {
-            if (whiteKingSideCastle && m.to == 62) { // move rook and prevent passing through/out of check
-                if (isWhiteInCheck(getAllPiecesBB()))
-                    return invalidMove;
-                whiteKingPos = 61;
-                if (isWhiteInCheck(getAllPiecesBB()))
-                    return invalidMove;
-                whiteRookBB ^= POS_TO_BITMASK(61) | POS_TO_BITMASK(63);
-            }
-            else if (whiteQueenSideCastle && m.to == 58) { // move rook and prevent passing through/out of check
-                if (isWhiteInCheck(getAllPiecesBB()))
-                    return invalidMove;
-                whiteKingPos = 59;
-                if (isWhiteInCheck(getAllPiecesBB()))
-                    return invalidMove;
-                whiteRookBB ^= POS_TO_BITMASK(59) | POS_TO_BITMASK(56);
-            }
-            whiteKingPos = m.to;
-            whiteKingSideCastle = false;
-            whiteQueenSideCastle = false;
-            whiteCapturePos(POS_TO_BITMASK(m.to));
-        }
-        else if ((whitePawnBB & mask) != 0) {
-            if (m.from <= 15) {
-                switch (RANK(m.to)) {
-                    case whiteQueen: whiteRookBB |= POS_TO_BITMASK(FILE(m.to)); whiteBishopBB |= POS_TO_BITMASK(FILE(m.to)); break;
-                    case whiteRook: whiteRookBB |= POS_TO_BITMASK(FILE(m.to)); break;
-                    case whiteBishop: whiteBishopBB |= POS_TO_BITMASK(FILE(m.to)); break;
-                    case whiteKnight: whiteKnightBB |= POS_TO_BITMASK(FILE(m.to)); break;
-                }
-                enPassantTarget = 64;
-            }
-            else {
-                if (m.to == enPassantTarget) {
-                    blackPawnBB &= ~POS_TO_BITMASK(24 + FILE(m.to));
-                    whiteCapturePos(POS_TO_BITMASK(m.to));
-                }
-                else if (RANK(m.from) == 6 && RANK(m.to) == 4)
-                    enPassantTarget = FILE(m.to) | 40;
-                else
-                    whiteCapturePos(POS_TO_BITMASK(m.to));
-                whitePawnBB |= POS_TO_BITMASK(m.to);
-            }
+    if (m.from == whiteKingPos) {piece = whiteKing;}
+    else if (m.from == blackKingPos) {piece = whiteKing;}
+    else if ((whitePawnBB & mask) != 0) {piece = whitePawn;}
+    else if ((whiteKnightBB & mask) != 0) {piece = whiteKnight;}
+    else if ((whiteBishopBB & mask) != 0) {piece = whiteBishop;}
+    else if ((whiteRookBB & mask) != 0) {piece = whiteRook;}
 
-            whitePawnBB &= ~mask;
-        }
-        else if ((whiteKnightBB & mask) != 0) {
-            whiteKnightBB |= POS_TO_BITMASK(m.to);
-            whiteKnightBB &= ~mask;
-            whiteCapturePos(POS_TO_BITMASK(m.to));
-        }
-        else if ((whiteBishopBB & mask) != 0) {
-            if ((whiteRookBB & mask) != 0) {
-                whiteRookBB |= POS_TO_BITMASK(m.to);
-                whiteRookBB &= ~mask;
-            }
-            whiteBishopBB |= POS_TO_BITMASK(m.to);
-            whiteBishopBB &= ~mask;
-            whiteCapturePos(POS_TO_BITMASK(m.to));
-        }
-        else if ((whiteRookBB & mask) != 0) {
-            if (m.from == 56)
-                whiteQueenSideCastle = false;
-            else if (m.from == 63)
-                whiteKingSideCastle = false;
-            whiteRookBB |= POS_TO_BITMASK(m.to);
-            whiteRookBB &= ~mask;
-            whiteCapturePos(POS_TO_BITMASK(m.to));
-        }
-        if (isWhiteInCheck(getAllPiecesBB())) {
-            return invalidMove;
-        }
-    }
-    else {
-        if (m.from == blackKingPos) {
-            if (blackKingSideCastle && m.to == 6) { // move rook and prevent passing through/out of check
-                if (isBlackInCheck(getAllPiecesBB()))
-                    return invalidMove;
-                blackKingPos = 5;
-                if (isBlackInCheck(getAllPiecesBB()))
-                    return invalidMove;
-                blackRookBB ^= POS_TO_BITMASK(5) | POS_TO_BITMASK(7);
-            }
-            else if (blackQueenSideCastle && m.to == 2) { // move rook and prevent passing through/out of check
-                if (isBlackInCheck(getAllPiecesBB()))
-                    return invalidMove;
-                blackKingPos = 3;
-                if (isBlackInCheck(getAllPiecesBB()))
-                    return invalidMove;
-                blackRookBB ^= POS_TO_BITMASK(3) | POS_TO_BITMASK(0);
-            }
-            blackKingPos = m.to;
-            blackKingSideCastle = false;
-            blackQueenSideCastle = false;
-            blackCapturePos(POS_TO_BITMASK(m.to));
-        }
-        else if ((blackPawnBB & mask) != 0) {
-            if (m.from >= 48) {
-                switch (RANK(m.to)) {
-                    case whiteQueen: blackRookBB |= POS_TO_BITMASK(FILE(m.to) | 56); blackBishopBB |= POS_TO_BITMASK(FILE(m.to) | 56); break;
-                    case whiteRook: blackRookBB |= POS_TO_BITMASK(FILE(m.to) | 56); break;
-                    case whiteBishop: blackBishopBB |= POS_TO_BITMASK(FILE(m.to) | 56); break;
-                    case whiteKnight: blackKnightBB |= POS_TO_BITMASK(FILE(m.to) | 56); break;
-                }
-                enPassantTarget = 64;
-            }
-            else {
-                // en passant
-                if (m.to == enPassantTarget) {
-                    whitePawnBB &= ~POS_TO_BITMASK(32 + FILE(m.to));
-                    blackCapturePos(POS_TO_BITMASK(m.to));
-                }
-                else if (RANK(m.from) == 1 && RANK(m.to) == 3)
-                    enPassantTarget = FILE(m.to) | 16;
-                else
-                    blackCapturePos(POS_TO_BITMASK(m.to));
-                blackPawnBB |= POS_TO_BITMASK(m.to);
-            }
+    else if ((blackPawnBB & mask) != 0) {piece = whitePawn;}
+    else if ((blackKnightBB & mask) != 0) {piece = whiteKnight;}
+    else if ((blackBishopBB & mask) != 0) {piece = whiteBishop;}
+    else if ((blackRookBB & mask) != 0) {piece = whiteRook;}
 
-            blackPawnBB &= ~mask;
-        }
-        else if ((blackKnightBB & mask) != 0) {
-            blackKnightBB |= POS_TO_BITMASK(m.to);
-            blackKnightBB &= ~mask;
-            blackCapturePos(POS_TO_BITMASK(m.to));
-        }
-        else if ((blackBishopBB & mask) != 0) {
-            if ((blackRookBB & mask) != 0) {
-                blackRookBB |= POS_TO_BITMASK(m.to);
-                blackRookBB &= ~mask;
-            }
-            blackBishopBB |= POS_TO_BITMASK(m.to);
-            blackBishopBB &= ~mask;
-            blackCapturePos(POS_TO_BITMASK(m.to));
-        }
-        else if ((blackRookBB & mask) != 0) {
-            if (m.from == 0)
-                blackQueenSideCastle = false;
-            else if (m.from == 7)
-                blackKingSideCastle = false;
-            blackRookBB |= POS_TO_BITMASK(m.to);
-            blackRookBB &= ~mask;
-            blackCapturePos(POS_TO_BITMASK(m.to));
-        }
-        if (isBlackInCheck(getAllPiecesBB())) {
-            return invalidMove;
-        }
-    }
-
-    isWhitesTurn = !isWhitesTurn;
-    
-    return gameNotOver;
+    if (isWhitesTurn)
+        return doMoveWhite(m, piece);
+    else
+        return doMoveBlack(m, piece);
 }
 
-int Board::quickDoMoveWhite(Move m, char piece) {
-    uint64_t mask = POS_TO_BITMASK(m.from);
+int Board::doMoveWhite(Move m, char piece) {
+    uint64_t from_mask = POS_TO_BITMASK(m.from);
+    uint64_t to_mask = POS_TO_BITMASK(m.to);
     switch (piece) {
         case whiteKing:
             if (whiteKingSideCastle && m.to == 62) { // move rook and prevent passing through/out of check
@@ -283,65 +172,55 @@ int Board::quickDoMoveWhite(Move m, char piece) {
             whiteKingPos = m.to;
             whiteKingSideCastle = false;
             whiteQueenSideCastle = false;
-            whiteCapturePos(POS_TO_BITMASK(m.to));
-            break;
-        case whiteQueen:
-            whiteRookBB |= POS_TO_BITMASK(m.to);
-            whiteRookBB &= ~mask;
-            whiteBishopBB |= POS_TO_BITMASK(m.to);
-            whiteBishopBB &= ~mask;
-            whiteCapturePos(POS_TO_BITMASK(m.to));
+            whiteCapturePos(to_mask);
             break;
         case whiteRook:
-            if ((whiteBishopBB & mask) != 0) {
-                whiteBishopBB |= POS_TO_BITMASK(m.to);
-                whiteBishopBB &= ~mask;
+            if ((whiteBishopBB & from_mask) != 0) {
+                whiteBishopBB ^= (to_mask | from_mask);
             }
             else if (m.from == 56)
                 whiteQueenSideCastle = false;
             else if (m.from == 63)
                 whiteKingSideCastle = false;
-            whiteRookBB |= POS_TO_BITMASK(m.to);
-            whiteRookBB &= ~mask;
-            whiteCapturePos(POS_TO_BITMASK(m.to));
+            whiteRookBB ^= (to_mask | from_mask);
+            whiteCapturePos(to_mask);
             break;
         case whiteBishop:
-            if ((whiteRookBB & mask) != 0) {
-                whiteRookBB |= POS_TO_BITMASK(m.to);
-                whiteRookBB &= ~mask;
+            if ((whiteRookBB & from_mask) != 0) {
+                whiteRookBB ^= (to_mask | from_mask);
             }
-            whiteBishopBB |= POS_TO_BITMASK(m.to);
-            whiteBishopBB &= ~mask;
-            whiteCapturePos(POS_TO_BITMASK(m.to));
+            whiteBishopBB ^= (to_mask | from_mask);
+            whiteCapturePos(to_mask);
             break;
         case whiteKnight:
-            whiteKnightBB |= POS_TO_BITMASK(m.to);
-            whiteKnightBB &= ~mask;
-            whiteCapturePos(POS_TO_BITMASK(m.to));
+            whiteKnightBB ^= (to_mask | from_mask);
+            whiteCapturePos(to_mask);
             break;
         case whitePawn:
             if (m.from <= 15) {
+                to_mask = POS_TO_BITMASK(FILE(m.to));
                 switch (RANK(m.to)) {
-                    case whiteQueen: whiteRookBB |= POS_TO_BITMASK(FILE(m.to)); whiteBishopBB |= POS_TO_BITMASK(FILE(m.to)); break;
-                    case whiteRook: whiteRookBB |= POS_TO_BITMASK(FILE(m.to)); break;
-                    case whiteBishop: whiteBishopBB |= POS_TO_BITMASK(FILE(m.to)); break;
-                    case whiteKnight: whiteKnightBB |= POS_TO_BITMASK(FILE(m.to)); break;
+                    case whiteQueen: whiteRookBB |= to_mask; whiteBishopBB |= to_mask; break;
+                    case whiteRook: whiteRookBB |= to_mask; break;
+                    case whiteBishop: whiteBishopBB |= to_mask; break;
+                    case whiteKnight: whiteKnightBB |= to_mask; break;
                 }
-                enPassantTarget = 64;
+                whitePawnBB &= ~from_mask;
+                whiteCapturePos(to_mask);
             }
             else {
                 if (m.to == enPassantTarget) {
                     blackPawnBB &= ~POS_TO_BITMASK(24 + FILE(m.to));
-                    whiteCapturePos(POS_TO_BITMASK(m.to));
+                    whiteCapturePos(to_mask);
                 }
                 else if (RANK(m.from) == 6 && RANK(m.to) == 4)
+                //else if ((static_cast<uint16_t>(m) & 0x3838) == 0x3020)
+                //else if ((m.from & 0b111000) == (6 << 3) && (m.to & 0b111000) == (4 << 3))
                     enPassantTarget = FILE(m.to) | 40;
                 else
-                    whiteCapturePos(POS_TO_BITMASK(m.to));
-                whitePawnBB |= POS_TO_BITMASK(m.to);
+                    whiteCapturePos(to_mask);
+                whitePawnBB ^= (to_mask | from_mask);
             }
-
-            whitePawnBB &= ~mask;
             break;
     }
     if (isWhiteInCheck(getAllPiecesBB())) {
@@ -354,8 +233,9 @@ int Board::quickDoMoveWhite(Move m, char piece) {
 }
 
 // piece is always passed in as white, but this function assumes its actually black
-int Board::quickDoMoveBlack(Move m, char piece) {
-    uint64_t mask = POS_TO_BITMASK(m.from);
+int Board::doMoveBlack(Move m, char piece) {
+    uint64_t from_mask = POS_TO_BITMASK(m.from);
+    uint64_t to_mask = POS_TO_BITMASK(m.to);
     switch (piece) {
         case whiteKing:
             if (blackKingSideCastle && m.to == 6) { // move rook and prevent passing through/out of check
@@ -377,66 +257,54 @@ int Board::quickDoMoveBlack(Move m, char piece) {
             blackKingPos = m.to;
             blackKingSideCastle = false;
             blackQueenSideCastle = false;
-            blackCapturePos(POS_TO_BITMASK(m.to));
-            break;
-        case whiteQueen:
-            blackRookBB |= POS_TO_BITMASK(m.to);
-            blackRookBB &= ~mask;
-            blackBishopBB |= POS_TO_BITMASK(m.to);
-            blackBishopBB &= ~mask;
-            blackCapturePos(POS_TO_BITMASK(m.to));
+            blackCapturePos(to_mask);
             break;
         case whiteRook:
-            if ((blackBishopBB & mask) != 0) {
-                blackBishopBB |= POS_TO_BITMASK(m.to);
-                blackBishopBB &= ~mask;
+            if ((blackBishopBB & from_mask) != 0) {
+                blackBishopBB ^= (to_mask | from_mask);
             }
             else if (m.from == 0)
                 blackQueenSideCastle = false;
             else if (m.from == 7)
                 blackKingSideCastle = false;
-            blackRookBB |= POS_TO_BITMASK(m.to);
-            blackRookBB &= ~mask;
-            blackCapturePos(POS_TO_BITMASK(m.to));
+            blackRookBB ^= (to_mask | from_mask);
+            blackCapturePos(to_mask);
             break;
         case whiteBishop:
-            if ((blackRookBB & mask) != 0) {
-                blackRookBB |= POS_TO_BITMASK(m.to);
-                blackRookBB &= ~mask;
+            if ((blackRookBB & from_mask) != 0) {
+                blackRookBB ^= (to_mask | from_mask);
             }
-            blackBishopBB |= POS_TO_BITMASK(m.to);
-            blackBishopBB &= ~mask;
-            blackCapturePos(POS_TO_BITMASK(m.to));
+            blackBishopBB ^= (to_mask | from_mask);
+            blackCapturePos(to_mask);
             break;
         case whiteKnight:
-            blackKnightBB |= POS_TO_BITMASK(m.to);
-            blackKnightBB &= ~mask;
-            blackCapturePos(POS_TO_BITMASK(m.to));
+            blackKnightBB ^= (to_mask | from_mask);
+            blackCapturePos(to_mask);
             break;
         case whitePawn:
             if (m.from >= 48) {
+                to_mask = POS_TO_BITMASK(m.to | 56); // (m.to | 56) sets the rank correctly (bc the rank stores the promotion piece)
                 switch (RANK(m.to)) {
-                    case whiteQueen: blackRookBB |= POS_TO_BITMASK(FILE(m.to) | 56); blackBishopBB |= POS_TO_BITMASK(FILE(m.to) | 56); break;
-                    case whiteRook: blackRookBB |= POS_TO_BITMASK(FILE(m.to) | 56); break;
-                    case whiteBishop: blackBishopBB |= POS_TO_BITMASK(FILE(m.to) | 56); break;
-                    case whiteKnight: blackKnightBB |= POS_TO_BITMASK(FILE(m.to) | 56); break;
+                    case whiteQueen: blackRookBB |= to_mask; blackBishopBB |= to_mask; break;
+                    case whiteRook: blackRookBB |= to_mask; break;
+                    case whiteBishop: blackBishopBB |= to_mask; break;
+                    case whiteKnight: blackKnightBB |= to_mask; break;
                 }
-                enPassantTarget = 64;
+                blackPawnBB &= ~from_mask;
+                blackCapturePos(to_mask);
             }
             else {
                 // en passant
                 if (m.to == enPassantTarget) {
                     whitePawnBB &= ~POS_TO_BITMASK(32 + FILE(m.to));
-                    blackCapturePos(POS_TO_BITMASK(m.to));
+                    blackCapturePos(to_mask);
                 }
                 else if (RANK(m.from) == 1 && RANK(m.to) == 3)
                     enPassantTarget = FILE(m.to) | 16;
                 else
-                    blackCapturePos(POS_TO_BITMASK(m.to));
-                blackPawnBB |= POS_TO_BITMASK(m.to);
+                    blackCapturePos(to_mask);
+                blackPawnBB ^= (to_mask | from_mask);
             }
-
-            blackPawnBB &= ~mask;
             break;
     }
 
@@ -461,7 +329,7 @@ bool Board::isCheck() {
 bool Board::isWhiteInCheck(uint64_t allPiecesBB) {
     int kingPos = whiteKingPos;
     const uint64_t *moveArray = checkBitBoards[kingPos];
-    int next;
+    uint64_t next;
 
     if ( (moveArray[0] & blackRookBB) != 0 ) {
         // maybe use a mask instead of pos
@@ -524,10 +392,11 @@ bool Board::isWhiteInCheck(uint64_t allPiecesBB) {
                 break;
             }
         }
+        return false;
     }
 
     if ( (moveArray[2] & blackKnightBB) != 0 ) {return true;}
-    if ( (moveArray[3] & ( POS_TO_BITMASK(blackKingPos))) != 0 ) {return true;}
+    //if ( (moveArray[3] & ( POS_TO_BITMASK(blackKingPos))) != 0 ) {return true;}
     if ( (moveArray[4] & blackPawnBB) != 0 ) {return true;}
 
     return false;
@@ -601,327 +470,372 @@ bool Board::isBlackInCheck(uint64_t allPiecesBB) {
     }
 
     if ( (moveArray[2] & whiteKnightBB) != 0 ) {return true;}
-    if ( (moveArray[3] & ( POS_TO_BITMASK(whiteKingPos))) != 0 ) {return true;}
+    //if ( (moveArray[3] & ( POS_TO_BITMASK(whiteKingPos))) != 0 ) {return true;}
     if ( (moveArray[5] & whitePawnBB) != 0 ) {return true;}
 
     return false;
 }
 
-void Board::startMoveGenerator(std::function<void(Move, char)> func, int *stop) {
-    uint64_t whitePiecesBB = whiteRookBB | whitePawnBB | whiteKnightBB | whiteBishopBB | POS_TO_BITMASK(whiteKingPos);
-    uint64_t blackPiecesBB = blackRookBB | blackPawnBB | blackKnightBB | blackBishopBB | POS_TO_BITMASK(blackKingPos);
-    uint64_t allPiecesBB = whitePiecesBB | blackPiecesBB;
-
-    if (isWhitesTurn) {
-        for (int pos = 0; pos < 64 && *stop == 0; pos++) {
-            if ((POS_TO_BITMASK(pos) & whitePiecesBB) != 0)
-                getMovesForWhitePiece(func, pos, whitePiecesBB, blackPiecesBB, allPiecesBB);
-        }
-        getWhiteKingMoves(func, whiteKingPos, allPiecesBB, whitePiecesBB);
-    }
-    else {
-        for (int pos = 0; pos < 64 && *stop == 0; pos++) {
-            if ((POS_TO_BITMASK(pos) & blackPiecesBB) != 0)
-                getMovesForBlackPiece(func, pos, whitePiecesBB, blackPiecesBB, allPiecesBB);
-        }
-        getBlackKingMoves(func, blackKingPos, allPiecesBB, blackPiecesBB);
-    }
+uint64_t Board::getAllPiecesBB() {
+    return whiteRookBB | whitePawnBB | whiteKnightBB | whiteBishopBB | blackRookBB | blackPawnBB | blackKnightBB | blackBishopBB | POS_TO_BITMASK(blackKingPos) | POS_TO_BITMASK(whiteKingPos);
 }
 
-void Board::getMovesForWhitePiece(function<void(Move, char)> func, int pos, uint64_t whiteBB, uint64_t blackBB, uint64_t allBB) {
-    uint64_t mask = POS_TO_BITMASK(pos);
-    if ((whitePawnBB & mask) != 0) {
-        getWhitePawnMoves(func, pos, allBB, blackBB);
-        return;
-    }
-    if ((whiteKnightBB & mask) != 0) {
-        getKnightMoves(func, pos, whiteBB);
-        return;
-    }
-    if ((whiteBishopBB & mask) != 0) {
-        getBishopMoves(func, pos, allBB, whiteBB);
-        // allow fallthrough here for queens
-    }
-    if ((whiteRookBB & mask) != 0) {
-        getRookMoves(func, pos, allBB, whiteBB);
-    }
+void Board::getAllMoves(void (*func)(Eval*, Move, char), Eval *e) {
+    if (isWhitesTurn)
+        getAllMovesWhite(func, e);
+    else
+        getAllMovesBlack(func, e);
 }
 
-void Board::getMovesForBlackPiece(function<void(Move, char)> func, int pos, uint64_t whiteBB, uint64_t blackBB, uint64_t allBB) {
-    uint64_t mask = POS_TO_BITMASK(pos);
-    if ((blackPawnBB & mask) != 0) {
-        getBlackPawnMoves(func, pos, allBB, whiteBB);
-        return;
-    }
-    if ((blackKnightBB & mask) != 0) {
-        getKnightMoves(func, pos, blackBB);
-        return;
-    }
-    if ((blackBishopBB & mask) != 0) {
-        getBishopMoves(func, pos, allBB, blackBB);
-        // allow falthrough here for queens
-    }
-    if ((blackRookBB & mask) != 0) {
-        getRookMoves(func, pos, allBB, blackBB);
-    }
-}
+void Board::getAllMovesWhite(void (*func)(Eval*, Move, char), Eval *e) {
+    uint64_t sameColorBB = whiteRookBB | whitePawnBB | whiteKnightBB | whiteBishopBB | POS_TO_BITMASK(whiteKingPos);
+    uint64_t oppositeColorBB = blackRookBB | blackPawnBB | blackKnightBB | blackBishopBB | POS_TO_BITMASK(blackKingPos);
+    uint64_t allPiecesBB = sameColorBB | oppositeColorBB;
 
-// TODO: should not be able to castle through checks
-void Board::getWhiteKingMoves(function<void(Move, char)> func, int pos, uint64_t allPiecesBB, uint64_t sameColorBB) {
-    const int *moveArray = kingMoves[pos];
-    int next;
+    const int8_t *kingMoveArray = kingMoves[whiteKingPos];
+    int8_t next;
+    int nextSectionIndex;
 
-    for (int i = 1; i < moveArray[0]; i++) {
-        next = moveArray[i];
-        if ( (POS_TO_BITMASK(next) & sameColorBB) == 0 )
-            func((Move) {pos, next}, whiteKing);
+    //const uint64_t *moveArray = checkBitBoards[kingPos];
+    const uint64_t blackKingProtected = checkBitBoards[blackKingPos][3];
+    //(moveArray[3] & ( POS_TO_BITMASK(blackKingPos))) != 0 ) {return true;}
+
+    // --- King ---
+    for (int i = 1; i < kingMoveArray[0]; i++) {
+        next = kingMoveArray[i];
+        if ( (POS_TO_BITMASK(next) & (sameColorBB | blackKingProtected)) == 0 )
+            func(e, (Move) {static_cast<int8_t>(whiteKingPos), next}, whiteKing);
     }
 
     if (whiteKingSideCastle &&
         ((POS_TO_BITMASK(61) | POS_TO_BITMASK(62)) & allPiecesBB) == 0 &&
         (POS_TO_BITMASK(63) & whiteRookBB) != 0 )
     {
-        func((Move) {pos, 62}, whiteKing);
+        func(e, (Move) {60, 62}, whiteKing);
     }
     if (whiteQueenSideCastle &&
         (POS_TO_BITMASK(56) & whiteRookBB) != 0 &&
         ((POS_TO_BITMASK(57) | POS_TO_BITMASK(58) | POS_TO_BITMASK(59)) & allPiecesBB) == 0)
     {
-        func((Move) {pos, 58}, whiteKing);
+        func(e, (Move) {60, 58}, whiteKing);
+    }
+
+    uint64_t mask;
+    for (int8_t pos = 0; pos < 64 && e->stop == 0; pos++) {
+        mask = POS_TO_BITMASK(pos);
+        if ((mask & sameColorBB) != 0) {
+            if ((whitePawnBB & mask) != 0) { // --- Pawn ---
+                // move 1 forward
+                next = pos - 8;
+                if ((POS_TO_BITMASK(next) & allPiecesBB) == 0) {
+                    Move m = {pos, next};
+                    if (next <= 7) { // encode promotion piece in destination rank
+                        m.to = FILE(next) | (whiteQueen << 3); func(e, m, whitePawn);
+                        m.to = FILE(next) | (whiteRook << 3); func(e, m, whitePawn);
+                        m.to = FILE(next) | (whiteBishop << 3); func(e, m, whitePawn);
+                        m.to = FILE(next) | (whiteKnight << 3); func(e, m, whitePawn);
+                    } else {
+                       func(e, m, whitePawn);
+
+                        // move 2 forward
+                        next -= 8;
+                        if (pos >= 48 && (POS_TO_BITMASK(next) & allPiecesBB) == 0)
+                            func(e, (Move) {pos, next}, whitePawn);
+                    }
+                }
+
+                // capture left and right (and en passant)
+                if (FILE(pos) != 0) {
+                    next = pos - 9;
+                    if ( (POS_TO_BITMASK(next) & oppositeColorBB) != 0 || (next == enPassantTarget) ) {
+                        Move m = {pos, next};
+                        if (next <= 7) { // encode promotion piece in destination rank
+                            m.to = FILE(next) | (whiteQueen << 3); func(e, m, whitePawn);
+                            m.to = FILE(next) | (whiteRook << 3); func(e, m, whitePawn);
+                            m.to = FILE(next) | (whiteBishop << 3); func(e, m, whitePawn);
+                            m.to = FILE(next) | (whiteKnight << 3); func(e, m, whitePawn);
+                        } else
+                            func(e, m, whitePawn);
+                    }
+                }
+                if (FILE(pos) != 7) {
+                    next = pos - 7;
+                    if ( (POS_TO_BITMASK(next) & oppositeColorBB) != 0 || (next == enPassantTarget) ) {
+                        Move m = {pos, next};
+                        if (next <= 7) { // encode promotion piece in destination rank
+                            m.to = FILE(next) | (whiteQueen << 3); func(e, m, whitePawn);
+                            m.to = FILE(next) | (whiteRook << 3); func(e, m, whitePawn);
+                            m.to = FILE(next) | (whiteBishop << 3); func(e, m, whitePawn);
+                            m.to = FILE(next) | (whiteKnight << 3); func(e, m, whitePawn);
+                        } else
+                            func(e, m, whitePawn);
+                    }
+                }
+                continue;
+            }
+            if ((whiteKnightBB & mask) != 0) { // --- Knight ---
+                const int8_t *knightMoveArray = knightMoves[pos];
+
+                for (int i = 1; i < knightMoveArray[0]; i++) {
+                    next = knightMoveArray[i];
+                    if ( (POS_TO_BITMASK(next) & sameColorBB) == 0 )
+                        func(e, (Move) {pos, next}, whiteKnight);
+                }
+                continue;
+            }
+            if ((whiteBishopBB & mask) != 0) { // --- Bishop ---
+                for (next = pos + 9; FILE(next) != 0 && next < 64; next += 9) {
+                    if ((POS_TO_BITMASK(next) & allPiecesBB) == 0) {
+                        func(e, (Move) {pos, next}, whiteBishop);
+                    } else {
+                        if ((POS_TO_BITMASK(next) & oppositeColorBB) != 0)
+                            func(e, (Move) {pos, next}, whiteBishop);
+                        break;
+                    }
+                }
+                for (next = pos + 7; FILE(next) != 7 && next < 64; next += 7) {
+                    if ((POS_TO_BITMASK(next) & allPiecesBB) == 0) {
+                        func(e, (Move) {pos, next}, whiteBishop);
+                    } else {
+                        if ((POS_TO_BITMASK(next) & oppositeColorBB) != 0)
+                            func(e, (Move) {pos, next}, whiteBishop);
+                        break;
+                    }
+                }
+                for (next = pos - 9; FILE(next) != 7 && next >= 0; next -= 9) {
+                    if ((POS_TO_BITMASK(next) & allPiecesBB) == 0) {
+                        func(e, (Move) {pos, next}, whiteBishop);
+                    } else {
+                        if ((POS_TO_BITMASK(next) & oppositeColorBB) != 0)
+                            func(e, (Move) {pos, next}, whiteBishop);
+                        break;
+                    }
+                }
+                for (next = pos - 7; FILE(next) != 0 && next >= 0; next -= 7) {
+                    if ((POS_TO_BITMASK(next) & allPiecesBB) == 0) {
+                        func(e, (Move) {pos, next}, whiteBishop);
+                    } else {
+                        if ((POS_TO_BITMASK(next) & oppositeColorBB) != 0)
+                            func(e, (Move) {pos, next}, whiteBishop);
+                        break;
+                    }
+                }
+                // allow fallthrough here for queens
+            }
+            if ((whiteRookBB & mask) != 0) { // --- Rook ---
+                for (next = pos + 1; FILE(next) != 0; next++) {
+                    if ((POS_TO_BITMASK(next) & allPiecesBB) == 0) {
+                        func(e, (Move) {pos, next}, whiteRook);
+                    } else {
+                        if ((POS_TO_BITMASK(next) & oppositeColorBB) != 0)
+                            func(e, (Move) {pos, next}, whiteRook);
+                        break;
+                    }
+                }
+                for (next = pos - 1; FILE(next) != 7; next--) {
+                    if ((POS_TO_BITMASK(next) & allPiecesBB) == 0) {
+                        func(e, (Move) {pos, next}, whiteRook);
+                    } else {
+                        if ((POS_TO_BITMASK(next) & oppositeColorBB) != 0)
+                            func(e, (Move) {pos, next}, whiteRook);
+                        break;
+                    }
+                }
+                for (next = pos + 8; next < 64; next += 8) {
+                    if ((POS_TO_BITMASK(next) & allPiecesBB) == 0) {
+                        func(e, (Move) {pos, next}, whiteRook);
+                    } else {
+                        if ((POS_TO_BITMASK(next) & oppositeColorBB) != 0)
+                            func(e, (Move) {pos, next}, whiteRook);
+                        break;
+                    }
+                }
+                for (next = pos - 8; next >= 0; next -= 8) {
+                    if ((POS_TO_BITMASK(next) & allPiecesBB) == 0) {
+                        func(e, (Move) {pos, next}, whiteRook);
+                    } else {
+                        if ((POS_TO_BITMASK(next) & oppositeColorBB) != 0)
+                            func(e, (Move) {pos, next}, whiteRook);
+                        break;
+                    }
+                }
+            }
+        }
     }
 }
 
-// TODO: should not be able to castle through checks
-void Board::getBlackKingMoves(function<void(Move, char)> func, int pos, uint64_t allPiecesBB, uint64_t sameColorBB) {
-    const int *moveArray = kingMoves[pos];
-    int next;
+void Board::getAllMovesBlack(void (*func)(Eval*, Move, char), Eval *e) {
+    uint64_t sameColorBB = blackRookBB | blackPawnBB | blackKnightBB | blackBishopBB | POS_TO_BITMASK(blackKingPos);
+    uint64_t oppositeColorBB = whiteRookBB | whitePawnBB | whiteKnightBB | whiteBishopBB | POS_TO_BITMASK(whiteKingPos);
+    uint64_t allPiecesBB = sameColorBB | oppositeColorBB;
 
-    for (int i = 1; i < moveArray[0]; i++) {
-        next = moveArray[i];
-        if ( (POS_TO_BITMASK(next) & sameColorBB) == 0 )
-            func((Move) {pos, next}, whiteKing);
+    const int8_t *kingMoveArray = kingMoves[blackKingPos];
+    int8_t next;
+    int nextSectionIndex;
+
+    const uint64_t whiteKingProtected = checkBitBoards[whiteKingPos][3];
+
+    // --- King ---
+    for (int i = 1; i < kingMoveArray[0]; i++) {
+        next = kingMoveArray[i];
+        if ( (POS_TO_BITMASK(next) & (sameColorBB | whiteKingProtected)) == 0 )
+            func(e, (Move) {static_cast<int8_t>(blackKingPos), next}, whiteKing);
     }
 
     if (blackKingSideCastle &&
         ((POS_TO_BITMASK(5) | POS_TO_BITMASK(6)) & allPiecesBB) == 0 &&
         (POS_TO_BITMASK(7) & blackRookBB) != 0 )
     {
-        func((Move) {pos, 6}, whiteKing);
+        func(e, (Move) {4, 6}, whiteKing);
     }
     if (blackQueenSideCastle &&
         (POS_TO_BITMASK(0) & blackRookBB) != 0 &&
         ((POS_TO_BITMASK(1) | POS_TO_BITMASK(2) | POS_TO_BITMASK(3)) & allPiecesBB) == 0)
     {
-        func((Move) {pos, 2}, whiteKing);
-    }
-}
-
-void Board::getRookMoves(function<void(Move, char)> func, int pos, uint64_t allPiecesBB, uint64_t sameColorBB) {
-    int next;
-    for (next = pos + 1; FILE(next) != 0; next++) {
-        if ((POS_TO_BITMASK(next) & sameColorBB) == 0) {
-            func((Move) {pos, next}, whiteRook);
-            if ((POS_TO_BITMASK(next) & allPiecesBB) != 0)
-                break;
-        } else {break;}
-    }
-    for (next = pos - 1; FILE(next) != 7; next--) {
-        if ((POS_TO_BITMASK(next) & sameColorBB) == 0) {
-            func((Move) {pos, next}, whiteRook);
-            if ((POS_TO_BITMASK(next) & allPiecesBB) != 0)
-                break;
-        } else {break;}
-    }
-    for (next = pos + 8; next < 64; next += 8) {
-        if ((POS_TO_BITMASK(next) & sameColorBB) == 0) {
-            func((Move) {pos, next}, whiteRook);
-            if ((POS_TO_BITMASK(next) & allPiecesBB) != 0)
-                break;
-        } else { break; }
-    }
-    for (next = pos - 8; next >= 0; next -= 8) {
-        if ((POS_TO_BITMASK(next) & sameColorBB) == 0) {
-            func((Move) {pos, next}, whiteRook);
-            if ((POS_TO_BITMASK(next) & allPiecesBB) != 0)
-                break;
-        } else {break;}
-    }
-}
-
-void Board::getBishopMoves(function<void(Move, char)> func, int pos, uint64_t allPiecesBB, uint64_t sameColorBB) {
-    int next;
-    for (next = pos + 9; FILE(next) != 0 && next < 64; next += 9) {
-        if ((POS_TO_BITMASK(next) & sameColorBB) == 0) {
-            func((Move) {pos, next}, whiteBishop);
-            if ((POS_TO_BITMASK(next) & allPiecesBB) != 0)
-                break;
-        } else {break;}
-    }
-    for (next = pos + 7; FILE(next) != 7 && next < 64; next += 7) {
-        if ((POS_TO_BITMASK(next) & sameColorBB) == 0) {
-            func((Move) {pos, next}, whiteBishop);
-            if ((POS_TO_BITMASK(next) & allPiecesBB) != 0)
-                break;
-        } else {break;}
-    }
-    for (next = pos - 9; FILE(next) != 7 && next >= 0; next -= 9) {
-        if ((POS_TO_BITMASK(next) & sameColorBB) == 0) {
-            func((Move) {pos, next}, whiteBishop);
-            if ((POS_TO_BITMASK(next) & allPiecesBB) != 0)
-                break;
-        } else {break;}
-    }
-    for (next = pos - 7; FILE(next) != 0 && next >= 0; next -= 7) {
-        if ((POS_TO_BITMASK(next) & sameColorBB) == 0) {
-            func((Move) {pos, next}, whiteBishop);
-            if ((POS_TO_BITMASK(next) & allPiecesBB) != 0)
-                break;
-        } else {break;}
-    }
-}
-
-void Board::getKnightMoves(function<void(Move, char)> func, int pos, uint64_t sameColorBB) {
-    const int *moveArray = knightMoves[pos];
-    int next;
-
-    for (int i = 1; i < moveArray[0]; i++) {
-        next = moveArray[i];
-        if ( (POS_TO_BITMASK(next) & sameColorBB) == 0 )
-            func((Move) {pos, next}, whiteKnight);
-    }
-}
-
-void Board::getWhitePawnMoves(function<void(Move, char)> func, int pos, uint64_t allPiecesBB, uint64_t oppositeColorBB) {
-    // move 1 forward
-    int next = pos - 8;
-    if ((POS_TO_BITMASK(next) & allPiecesBB) == 0) {
-        Move m = {pos, next};
-        if (next <= 7) { // encode promotion piece in destination rank
-            m.to = FILE(next) | (whiteQueen << 3); func(m, whitePawn);
-            m.to = FILE(next) | (whiteRook << 3); func(m, whitePawn);
-            m.to = FILE(next) | (whiteBishop << 3); func(m, whitePawn);
-            m.to = FILE(next) | (whiteKnight << 3); func(m, whitePawn);
-        } else {
-           func(m, whitePawn);
-
-            // move 2 forward
-            next -= 8;
-            if (pos >= 48 && (POS_TO_BITMASK(next) & allPiecesBB) == 0)
-                func((Move) {pos, next}, whitePawn);
-        }
+        func(e, (Move) {4, 2}, whiteKing);
     }
 
-    // capture left and right (and en passant)
-    if (FILE(pos) != 0) {
-        next = pos - 9;
-        if ( (POS_TO_BITMASK(next) & oppositeColorBB) != 0 || (next == enPassantTarget) ) {
-            Move m = {pos, next};
-            if (next <= 7) { // encode promotion piece in destination rank
-                m.to = FILE(next) | (whiteQueen << 3); func(m, whitePawn);
-                m.to = FILE(next) | (whiteRook << 3); func(m, whitePawn);
-                m.to = FILE(next) | (whiteBishop << 3); func(m, whitePawn);
-                m.to = FILE(next) | (whiteKnight << 3); func(m, whitePawn);
-            } else
-                func(m, whitePawn);
-        }
-    }
-    if (FILE(pos) != 7) {
-        next = pos - 7;
-        if ( (POS_TO_BITMASK(next) & oppositeColorBB) != 0 || (next == enPassantTarget) ) {
-            Move m = {pos, next};
-            if (next <= 7) { // encode promotion piece in destination rank
-                m.to = FILE(next) | (whiteQueen << 3); func(m, whitePawn);
-                m.to = FILE(next) | (whiteRook << 3); func(m, whitePawn);
-                m.to = FILE(next) | (whiteBishop << 3); func(m, whitePawn);
-                m.to = FILE(next) | (whiteKnight << 3); func(m, whitePawn);
-            } else
-                func(m, whitePawn);
-        }
-    }
-}
+    uint64_t mask;
+    for (int8_t pos = 0; pos < 64 && e->stop == 0; pos++) {
+        mask = POS_TO_BITMASK(pos);
+        if ((mask & sameColorBB) != 0) {
+            if ((blackPawnBB & mask) != 0) { // --- Pawn ---
+                // move 1 forward
+                next = pos + 8;
+                if ((POS_TO_BITMASK(next) & allPiecesBB) == 0) {
+                    Move m = {pos, next};
+                    if (next >= 56) { // encode promotion piece in destination rank
+                        m.to = FILE(next) | (whiteQueen << 3); func(e, m, whitePawn);
+                        m.to = FILE(next) | (whiteRook << 3); func(e, m, whitePawn);
+                        m.to = FILE(next) | (whiteBishop << 3); func(e, m, whitePawn);
+                        m.to = FILE(next) | (whiteKnight << 3); func(e, m, whitePawn);
+                    } else {
+                        func(e, m, whitePawn);
 
-void Board::getBlackPawnMoves(function<void(Move, char)> func, int pos, uint64_t allPiecesBB, uint64_t oppositeColorBB) {
-    // move 1 forward
-    int next = pos + 8;
-    if ((POS_TO_BITMASK(next) & allPiecesBB) == 0) {
-        Move m = {pos, next};
-        if (next >= 56) { // encode promotion piece in destination rank
-            m.to = FILE(next) | (whiteQueen << 3); func(m, whitePawn);
-            m.to = FILE(next) | (whiteRook << 3); func(m, whitePawn);
-            m.to = FILE(next) | (whiteBishop << 3); func(m, whitePawn);
-            m.to = FILE(next) | (whiteKnight << 3); func(m, whitePawn);
-        } else {
-            func(m, whitePawn);
+                        // move 2 forward
+                        next += 8;
+                        if (pos <= 15 && (POS_TO_BITMASK(next) & allPiecesBB) == 0)
+                            func(e, (Move) {pos, next}, whitePawn);
+                    }
+                }
 
-            // move 2 forward
-            next += 8;
-            if (pos <= 15 && (POS_TO_BITMASK(next) & allPiecesBB) == 0)
-                func((Move) {pos, next}, whitePawn);
-        }
-    }
+                // capture left and right (and en passant)
+                if (FILE(pos) != 0) {
+                    next = pos + 7;
+                    if ( (POS_TO_BITMASK(next) & oppositeColorBB) != 0 || (next == enPassantTarget) ) {
+                        Move m = {pos, next};
+                        if (next >= 56) { // encode promotion piece in destination rank
+                            m.to = FILE(next) | (whiteQueen << 3); func(e, m, whitePawn);
+                            m.to = FILE(next) | (whiteRook << 3); func(e, m, whitePawn);
+                            m.to = FILE(next) | (whiteBishop << 3); func(e, m, whitePawn);
+                            m.to = FILE(next) | (whiteKnight << 3); func(e, m, whitePawn);
+                        } else
+                            func(e, m, whitePawn);
+                    }
+                }
+                if (FILE(pos) != 7) {
+                    next = pos + 9;
+                    if ( (POS_TO_BITMASK(next) & oppositeColorBB) != 0 || (next == enPassantTarget) ) {
+                        Move m = {pos, next};
+                        if (next >= 56) { // encode promotion piece in destination rank
+                            m.to = FILE(next) | (whiteQueen << 3); func(e, m, whitePawn);
+                            m.to = FILE(next) | (whiteRook << 3); func(e, m, whitePawn);
+                            m.to = FILE(next) | (whiteBishop << 3); func(e, m, whitePawn);
+                            m.to = FILE(next) | (whiteKnight << 3); func(e, m, whitePawn);
+                        } else
+                            func(e, m, whitePawn);
+                    }
+                }
+                continue;
+            }
+            if ((blackKnightBB & mask) != 0) { // --- Knight ---
+                const int8_t *knightMoveArray = knightMoves[pos];
 
-    // capture left and right (and en passant)
-    if (FILE(pos) != 0) {
-        next = pos + 7;
-        if ( (POS_TO_BITMASK(next) & oppositeColorBB) != 0 || (next == enPassantTarget) ) {
-            Move m = {pos, next};
-            if (next >= 56) { // encode promotion piece in destination rank
-                m.to = FILE(next) | (whiteQueen << 3); func(m, whitePawn);
-                m.to = FILE(next) | (whiteRook << 3); func(m, whitePawn);
-                m.to = FILE(next) | (whiteBishop << 3); func(m, whitePawn);
-                m.to = FILE(next) | (whiteKnight << 3); func(m, whitePawn);
-            } else
-                func(m, whitePawn);
-        }
-    }
-    if (FILE(pos) != 7) {
-        next = pos + 9;
-        if ( (POS_TO_BITMASK(next) & oppositeColorBB) != 0 || (next == enPassantTarget) ) {
-            Move m = {pos, next};
-            if (next >= 56) { // encode promotion piece in destination rank
-                m.to = FILE(next) | (whiteQueen << 3); func(m, whitePawn);
-                m.to = FILE(next) | (whiteRook << 3); func(m, whitePawn);
-                m.to = FILE(next) | (whiteBishop << 3); func(m, whitePawn);
-                m.to = FILE(next) | (whiteKnight << 3); func(m, whitePawn);
-            } else
-                func(m, whitePawn);
+                for (int i = 1; i < knightMoveArray[0]; i++) {
+                    next = knightMoveArray[i];
+                    if ( (POS_TO_BITMASK(next) & sameColorBB) == 0 )
+                        func(e, (Move) {pos, next}, whiteKnight);
+                }
+                continue;
+            }
+            if ((blackBishopBB & mask) != 0) { // --- Bishop ---
+                for (next = pos + 9; FILE(next) != 0 && next < 64; next += 9) {
+                    if ((POS_TO_BITMASK(next) & allPiecesBB) == 0) {
+                        func(e, (Move) {pos, next}, whiteBishop);
+                    } else {
+                        if ((POS_TO_BITMASK(next) & oppositeColorBB) != 0)
+                            func(e, (Move) {pos, next}, whiteBishop);
+                        break;
+                    }
+                }
+                for (next = pos + 7; FILE(next) != 7 && next < 64; next += 7) {
+                    if ((POS_TO_BITMASK(next) & allPiecesBB) == 0) {
+                        func(e, (Move) {pos, next}, whiteBishop);
+                    } else {
+                        if ((POS_TO_BITMASK(next) & oppositeColorBB) != 0)
+                            func(e, (Move) {pos, next}, whiteBishop);
+                        break;
+                    }
+                }
+                for (next = pos - 9; FILE(next) != 7 && next >= 0; next -= 9) {
+                    if ((POS_TO_BITMASK(next) & allPiecesBB) == 0) {
+                        func(e, (Move) {pos, next}, whiteBishop);
+                    } else {
+                        if ((POS_TO_BITMASK(next) & oppositeColorBB) != 0)
+                            func(e, (Move) {pos, next}, whiteBishop);
+                        break;
+                    }
+                }
+                for (next = pos - 7; FILE(next) != 0 && next >= 0; next -= 7) {
+                    if ((POS_TO_BITMASK(next) & allPiecesBB) == 0) {
+                        func(e, (Move) {pos, next}, whiteBishop);
+                    } else {
+                        if ((POS_TO_BITMASK(next) & oppositeColorBB) != 0)
+                            func(e, (Move) {pos, next}, whiteBishop);
+                        break;
+                    }
+                }
+                // allow fallthrough here for queens
+            }
+            if ((blackRookBB & mask) != 0) { // --- Rook ---
+                for (next = pos + 1; FILE(next) != 0; next++) {
+                    if ((POS_TO_BITMASK(next) & allPiecesBB) == 0) {
+                        func(e, (Move) {pos, next}, whiteRook);
+                    } else {
+                        if ((POS_TO_BITMASK(next) & oppositeColorBB) != 0)
+                            func(e, (Move) {pos, next}, whiteRook);
+                        break;
+                    }
+                }
+                for (next = pos - 1; FILE(next) != 7; next--) {
+                    if ((POS_TO_BITMASK(next) & allPiecesBB) == 0) {
+                        func(e, (Move) {pos, next}, whiteRook);
+                    } else {
+                        if ((POS_TO_BITMASK(next) & oppositeColorBB) != 0)
+                            func(e, (Move) {pos, next}, whiteRook);
+                        break;
+                    }
+                }
+                for (next = pos + 8; next < 64; next += 8) {
+                    if ((POS_TO_BITMASK(next) & allPiecesBB) == 0) {
+                        func(e, (Move) {pos, next}, whiteRook);
+                    } else {
+                        if ((POS_TO_BITMASK(next) & oppositeColorBB) != 0)
+                            func(e, (Move) {pos, next}, whiteRook);
+                        break;
+                    }
+                }
+                for (next = pos - 8; next >= 0; next -= 8) {
+                    if ((POS_TO_BITMASK(next) & allPiecesBB) == 0) {
+                        func(e, (Move) {pos, next}, whiteRook);
+                    } else {
+                        if ((POS_TO_BITMASK(next) & oppositeColorBB) != 0)
+                            func(e, (Move) {pos, next}, whiteRook);
+                        break;
+                    }
+                }
+            }
         }
     }
 }
 
-// popCount from https://www.chessprogramming.org/Population_Count
-const uint64_t k1 = 0x5555555555555555; /*  -1/3   */
-const uint64_t k2 = 0x3333333333333333; /*  -1/5   */
-const uint64_t k4 = 0x0f0f0f0f0f0f0f0f; /*  -1/17  */
-const uint64_t kf = 0x0101010101010101; /*  -1/255 */
-int popCount(uint64_t x) {
-    x =  x       - ((x >> 1)  & k1); /* put count of each 2 bits into those 2 bits */
-    x = (x & k2) + ((x >> 2)  & k2); /* put count of each 4 bits into those 4 bits */
-    x = (x       +  (x >> 4)) & k4 ; /* put count of each 8 bits into those 8 bits */
-    x = (x * kf) >> 56; /* returns 8 most significant bits of x + (x<<8) + (x<<16) + (x<<24) + ...  */
-    return (int) x;
-}
-
-int Board::getMaterialDiff() {
-    int sum;
-    sum =  popCount(whitePawnBB);
-    sum += popCount(whiteKnightBB) * 3;
-    sum += popCount(whiteBishopBB) * 3;
-    sum += popCount(whiteRookBB) * 5;
-    sum += popCount(whiteBishopBB & whiteRookBB); // bishop and rook already counted for 8pts
-
-    sum -= popCount(blackPawnBB);
-    sum -= popCount(blackKnightBB) * 3;
-    sum -= popCount(blackBishopBB) * 3;
-    sum -= popCount(blackRookBB) * 5;
-    sum -= popCount(blackBishopBB & blackRookBB); // bishop and rook already counted for 8pts
-    return sum;
-}
-
-bool Board::getIsWhitesTurn() {
-    return isWhitesTurn;
-}
-
-uint64_t Board::getAllPiecesBB() {
-    return whiteRookBB | whitePawnBB | whiteKnightBB | whiteBishopBB | blackRookBB | blackPawnBB | blackKnightBB | blackBishopBB | POS_TO_BITMASK(blackKingPos) | POS_TO_BITMASK(whiteKingPos);
-}
